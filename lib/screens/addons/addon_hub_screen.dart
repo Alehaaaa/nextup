@@ -21,6 +21,7 @@ import '../../services/storage_service.dart';
 import '../../services/stremio_marketplace_service.dart';
 import '../../services/stremio_service.dart';
 import '../../theme/app_theme_scope.dart';
+import '../../services/addon_auto_update.dart';
 import '../../utils/tv_keys.dart';
 import '../../widgets/see_all/see_all_theme.dart';
 import '../../widgets/see_all/stremio_dropdown.dart';
@@ -1158,6 +1159,11 @@ sheetAnimationStyle: kMenuSheetAnimation,
       ),
       Offset.zero & overlay.size,
     );
+    // The menu must open even when the setting cannot be read.
+    final autoUpdate = await AddonAutoUpdate.isEnabled().catchError(
+      (_) => true,
+    );
+    if (!mounted) return;
     final choice = await showMenu<String>(
 popUpAnimationStyle: kPopupMenuAnimation,
       context: context,
@@ -1172,6 +1178,11 @@ popUpAnimationStyle: kPopupMenuAnimation,
         _menuItem('import', Icons.file_upload_outlined, 'Import from JSON'),
         _menuItem('update', Icons.sync_rounded, 'Update all'),
         _menuItem(
+          'auto',
+          autoUpdate ? Icons.toggle_on_rounded : Icons.toggle_off_rounded,
+          autoUpdate ? 'Auto-update: on' : 'Auto-update: off',
+        ),
+        _menuItem(
           'delete',
           Icons.delete_outline_rounded,
           'Delete all',
@@ -1185,6 +1196,22 @@ popUpAnimationStyle: kPopupMenuAnimation,
         break;
       case 'update':
         _updateAll();
+        break;
+      case 'auto':
+        final saved = await AddonAutoUpdate.setEnabled(
+          !autoUpdate,
+        ).then((_) => true, onError: (_) => false);
+        if (saved && mounted) {
+          ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+            SnackBar(
+              content: Text(
+                autoUpdate
+                    ? 'Addons will only update when you ask'
+                    : 'Addons will update once a day',
+              ),
+            ),
+          );
+        }
         break;
       case 'delete':
         _deleteAll();

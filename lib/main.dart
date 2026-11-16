@@ -1,3 +1,4 @@
+import 'services/addon_auto_update_scheduler.dart';
 import 'services/torrent_playback_service.dart';
 import 'services/webdav_sync/webdav_log_upload.dart';
 import 'services/cache_scratch_cleanup.dart';
@@ -815,6 +816,7 @@ Future<void> _continueApplicationStartup() async {
   WidgetsBinding.instance.addPostFrameCallback((_) {
     unawaited(_prewarmIptvCatalogDb());
     IptvCatalogRefreshService.instance.start();
+    AddonAutoUpdateScheduler.instance.start();
     // Downloads waiting on a debrid provider pick up where they left off.
     TorrentDownloads.resumeDownloadsWhenReady(_navigatorKey);
   });
