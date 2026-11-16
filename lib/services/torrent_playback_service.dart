@@ -36,6 +36,7 @@ import '../models/source_intent.dart';
 import '../models/torrent_filter_state.dart';
 import '../theme/app_theme_scope.dart';
 import '../utils/deovr_utils.dart' as deovr;
+import 'source_search_preferences.dart';
 import '../utils/dialog_tap_guard.dart';
 import '../utils/filter_ladder.dart';
 import '../utils/torrent_filter_matcher.dart';
@@ -3889,15 +3890,20 @@ class TorrentPlaybackService {
     );
   }
 
-  static Future<List<SourceAddonRef>> _mediaServerSourceRefs() async => [
-    for (final server in await MediaServerService.connections())
-      SourceAddonRef(
-        'mediaserver:${server.id}',
-        server.label,
-        addonKey: 'mediaserver:${server.id}',
-        resultSourceKey: 'mediaserver:${server.id}',
-      ),
-  ];
+  static Future<List<SourceAddonRef>> _mediaServerSourceRefs() async {
+    if (!(await SourceSearchPreferences.readOrDefault()).mediaServers) {
+      return const [];
+    }
+    return [
+      for (final server in await MediaServerService.connections())
+        SourceAddonRef(
+          'mediaserver:${server.id}',
+          server.label,
+          addonKey: 'mediaserver:${server.id}',
+          resultSourceKey: 'mediaserver:${server.id}',
+        ),
+    ];
+  }
 
   static Future<List<Torrent>?> _fetchMediaServerSources(
     String sourceKey,
