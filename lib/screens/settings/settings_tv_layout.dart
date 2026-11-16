@@ -1,3 +1,4 @@
+import 'package:debrify/screens/settings/storage_usage_route.dart';
 import 'playback_settings_section.dart';
 import 'tv_collection_list_style_page.dart';
 import '../../widgets/collections/tmdb_attribution.dart';
@@ -1303,6 +1304,11 @@ class _SettingsTvLayoutState extends State<SettingsTvLayout> {
                 SettingsTile.spec(
                   SettingsRows.clearPlayback,
                   onTap: widget.onClearPlayback,
+                  focusNode: nextNode(),
+                ),
+                SettingsTile.spec(
+                  SettingsRows.storageUsage,
+                  onTap: () => openStorageUsagePage(context),
                   focusNode: nextNode(),
                 ),
               ],

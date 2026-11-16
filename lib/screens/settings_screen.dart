@@ -1,3 +1,4 @@
+import 'package:debrify/screens/settings/storage_usage_route.dart';
 import 'settings/tv_collection_list_style_page.dart';
 import 'settings/metadata_settings_page.dart';
 import '../widgets/collections/tmdb_attribution.dart';
@@ -2789,6 +2790,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
           'reset progress',
           'continue watching',
         ],
+      ),
+
+      nav(
+        SettingsRows.storageUsage,
+        'Data & Backup',
+        () => openStorageUsagePage(context),
+        keywords: const ['disk', 'space', 'cache', 'size', 'storage'],
       ),
 
       // Backup & Restore
@@ -8287,6 +8295,10 @@ class _SettingsLayout extends StatelessWidget {
                   SettingsRows.clearPlayback,
                   onTap: onClearPlayback,
                 ),
+                SettingsTile.spec(
+                  SettingsRows.storageUsage,
+                  onTap: () => openStorageUsagePage(context),
+                ),
               ],
             ),
             const SizedBox(height: 18),
@@ -8719,6 +8731,10 @@ class _SettingsLayout extends StatelessWidget {
                     SettingsTile.spec(
                       SettingsRows.clearPlayback,
                       onTap: onClearPlayback,
+                    ),
+                    SettingsTile.spec(
+                      SettingsRows.storageUsage,
+                      onTap: () => openStorageUsagePage(context),
                     ),
                     SettingsTile.spec(
                       SettingsRows.createBackup,

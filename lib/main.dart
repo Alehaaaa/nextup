@@ -1,3 +1,4 @@
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'services/addon_auto_update_scheduler.dart';
 import 'services/torrent_playback_service.dart';
 import 'services/webdav_sync/webdav_log_upload.dart';
@@ -1149,6 +1150,13 @@ class _DebrifyAppState extends State<DebrifyApp> {
           // for legacy and for the seventeen themes that declare neither, so
           // the common path costs one build and no layer.
           child: WebDavSaveStatus(child: AppTexture(child: child!)),
+        );
+        // Riverpod's app scope, above the root Navigator so every route and
+        // dialog shares the feature providers. Retries stay with the
+        // services that already own them.
+        content = ProviderScope(
+          retry: (count, error) => null,
+          child: content,
         );
         // Pointer input counts as presence too — an Apple TV remote's
         // trackpad and an attached mouse both arrive here rather than through

@@ -362,6 +362,11 @@ abstract final class SettingsRows {
     title: 'Clear Playback Data',
     subtitle: 'Reset resume points and playback sessions',
   );
+  static const storageUsage = SettingsRowContent(
+    icon: Icons.storage_rounded,
+    title: 'Storage Usage',
+    subtitle: 'See what Nextup keeps on this device',
+  );
   static const createBackup = SettingsRowContent(
     icon: Icons.save_alt_rounded,
     title: 'Create Backup',
