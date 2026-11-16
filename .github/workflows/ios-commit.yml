@@ -31,7 +31,10 @@ env:
 
 jobs:
   build:
-    runs-on: macos-latest
+    # macos-latest is an arm64 runner. GitHub repeatedly cancelled this repo's
+    # jobs after 15 minutes because no arm64 capacity became available. Use the
+    # standard Intel image, which has the same 14 GB memory allocation.
+    runs-on: macos-26-intel
     outputs:
       ipa_name: ${{ steps.ipa.outputs.name }}
       release_tag: ${{ steps.publish.outputs.release_tag }}
