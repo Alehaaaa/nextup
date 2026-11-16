@@ -39,6 +39,7 @@ import 'home/home_theme.dart';
 import '../services/tracking_source_policy.dart';
 import '../services/watched_action_coordinator.dart';
 import '../services/season_watched_service.dart';
+import '../services/earlier_episodes.dart';
 import 'season_action_region.dart';
 import '../utils/series_rewatch.dart';
 import '../theme/app_motion.dart' show kMenuSheetAnimation;
@@ -857,6 +858,114 @@ class EpisodesPanelState extends State<EpisodesPanel> {
         duration: const Duration(seconds: 2),
       ),
     );
+  }
+
+  /// One earlier-episodes batch at a time.
+  bool _earlierActionBusy = false;
+
+  static String _countOf(int n, String noun) =>
+      n == 1 ? '1 $noun' : '$n ${noun}s';
+
+  /// "Mark earlier episodes watched": batch-mark every aired episode before
+  /// this one on this device plus every tracker a single watched-write would
+  /// touch. The ticks are re-read (not painted) afterwards, so failed trackers
+  /// never show a false tick.
+  Future<void> _markEarlierWatched(TraktEpisode episode) async {
+    if (_earlierActionBusy) return;
+    final show = _selectedShow;
+    if (show == null) return;
+    final imdbId = show.progressId ?? show.id;
+    final refs = earlierEpisodes(
+      _episodeSeasons,
+      season: episode.season,
+      episode: episode.number,
+      now: DateTime.now(),
+    );
+    if (refs.isEmpty) return;
+    final messenger = ScaffoldMessenger.of(context);
+    final confirmed = await showDialog<bool>(
+      useRootNavigator: true,
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Mark earlier episodes watched?'),
+        content: Text(
+          'Marks ${_countOf(refs.length, 'earlier episode')} of ${show.name} '
+          'as watched.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            autofocus: true,
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Mark watched'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    _earlierActionBusy = true;
+    // Capture the originating profile: a switch mid-batch must stop writes.
+    final scope = ProfileRuntime.scope.value;
+    messenger.showSnackBar(
+      SnackBar(
+        content: Text('Marking ${_countOf(refs.length, 'episode')} watched…'),
+      ),
+    );
+    try {
+      final providers = await WatchedActionCoordinator.episodeWriteProviders(
+        imdbId,
+      );
+      final result = await markEarlierEpisodesWatched(
+        imdbId: imdbId,
+        seriesTitle: show.name,
+        episodes: refs,
+        providers: providers,
+        canContinue: () => ProfileRuntime.scope.value == scope && mounted,
+        mark: (id, season, eps, provider, {seriesTitle}) =>
+            SeasonWatchedService.mark(
+              id,
+              season,
+              eps,
+              provider,
+              seriesTitle: seriesTitle,
+            ),
+      );
+      if (!mounted) return;
+      if (result.cancelled) {
+        messenger.hideCurrentSnackBar();
+        return;
+      }
+      MdblistContinueWatchingService.instance.invalidate();
+      // Re-read the real ticks instead of painting them: a tracker whose
+      // write failed must not keep a fake tick.
+      await refreshWatchProgress();
+      if (!mounted) return;
+      messenger.hideCurrentSnackBar();
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(
+            result.hasFailures
+                ? 'Marked ${_countOf(refs.length, 'episode')}; some trackers '
+                      'failed. Try again to retry them.'
+                : 'Marked ${_countOf(refs.length, 'episode')} watched',
+          ),
+        ),
+      );
+    } catch (_) {
+      if (mounted) {
+        messenger.hideCurrentSnackBar();
+        messenger.showSnackBar(
+          const SnackBar(
+            content: Text('Could not mark earlier episodes. Please retry.'),
+          ),
+        );
+      }
+    } finally {
+      _earlierActionBusy = false;
+    }
   }
 
   /// Handle the episode quick-strip / long-press menu against Trakt. The
@@ -2581,6 +2690,16 @@ sheetAnimationStyle: kMenuSheetAnimation,context: context,
   void _showEpisodeOptions(TraktEpisode episode) {
     final key = '${episode.season}-${episode.number}';
     final watched = (_episodeWatchProgress[key] ?? 0) >= 100;
+    // Batch shortcut next to the single-episode toggle: every aired episode
+    // before this one. Direct sources have no watched storage to write.
+    final earlier = !_isDirectSource
+        ? earlierEpisodes(
+            _episodeSeasons,
+            season: episode.season,
+            episode: episode.number,
+            now: DateTime.now(),
+          )
+        : const <EpisodeRef>[];
     showModalBottomSheet<void>(
 sheetAnimationStyle: kMenuSheetAnimation,
       context: context,
@@ -2659,6 +2778,15 @@ sheetAnimationStyle: kMenuSheetAnimation,
               subtitle: _watchedSyncTargets(watched: true).length > 1
                   ? 'On ${_joinNames(_watchedSyncTargets(watched: true))}'
                   : null,
+            ),
+          if (earlier.isNotEmpty)
+            tile(
+              Icons.done_all_rounded,
+              'Mark earlier episodes watched',
+              () => _markEarlierWatched(episode),
+              subtitle: earlier.length == 1
+                  ? '1 episode before this one'
+                  : '${earlier.length} episodes before this one',
             ),
           if (watched && !_isDirectSource)
             tile(
