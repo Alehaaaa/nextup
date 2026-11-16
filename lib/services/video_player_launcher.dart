@@ -951,7 +951,8 @@ class VideoPlayerLauncher {
     final trackingPolicy = (await TrackingSourcePolicy.load()).forContent(
       args.contentImdbId,
     );
-    final defaultPlayerMode = await StorageService.getDefaultPlayerMode();
+    final defaultPlayerMode =
+        playerModeOverride ?? await StorageService.getDefaultPlayerMode();
     if (!context.mounted) return;
     if (shouldExplainExternalPlayerFallback(args, defaultPlayerMode)) {
       final useDebrifyPlayer = await showAuthenticatedWebDavPlayerNotice(
@@ -1516,6 +1517,21 @@ class VideoPlayerLauncher {
         }(),
     ]);
   }
+
+  static const Symbol _playerModeOverrideKey = #nextupPlayerModeOverride;
+
+  /// One launch's player ('debrify' / 'external'), chosen from a source row's
+  /// "Play in …" action; null means the profile's default player applies.
+  /// Carried by the zone of [withPlayerMode], so it reaches exactly the
+  /// launch started inside it and nothing afterwards.
+  static String? get playerModeOverride =>
+      Zone.current[_playerModeOverrideKey] as String?;
+
+  /// Runs [launch] with [mode] as its player. The saved default is untouched.
+  static Future<T> withPlayerMode<T>(
+    String mode,
+    Future<T> Function() launch,
+  ) => runZoned(launch, zoneValues: {_playerModeOverrideKey: mode});
 
   /// Whether playback should leave the app entirely, per the user's default
   /// player setting. Screens that build their own player route ask this before

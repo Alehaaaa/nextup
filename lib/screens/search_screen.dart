@@ -1673,15 +1673,13 @@ class _SearchScreenState extends State<SearchScreen>
   /// CW ids. Seed those new ids after the Simkl CW family instead of allowing
   /// the generic ordering projection to append them at the bottom. Any MDBList
   /// id already saved keeps its chosen position untouched.
-  List<String> get _effectiveHomeRowOrder => HomeRowOrder.seedCollections(
-    HomeRowOrder.seedNewRows(_homeRowOrder),
-    [
-      for (final c in _homeCollections)
-        if (c.pinToTop) HomeCollectionRowIds.collection(c.id),
-      for (final c in _homeCollections)
-        if (!c.pinToTop) HomeCollectionRowIds.collection(c.id),
-    ],
-  );
+  List<String> get _effectiveHomeRowOrder =>
+      HomeRowOrder.seedCollections(HomeRowOrder.seedNewRows(_homeRowOrder), [
+        for (final c in _homeCollections)
+          if (c.pinToTop) HomeCollectionRowIds.collection(c.id),
+        for (final c in _homeCollections)
+          if (!c.pinToTop) HomeCollectionRowIds.collection(c.id),
+      ]);
 
   /// Whether the Trakt rows should be held open with skeleton placeholders: the
   /// account is connected, its (slow, network) Continue Watching fetch is in
@@ -3912,7 +3910,9 @@ class _SearchScreenState extends State<SearchScreen>
     // resume-write ripples (WebDAV sync → HomeRowRefresh.playback) that do not
     // actually change the list. A real change (reorder, new episode, removal,
     // settings) bumps updatedAt/the source and falls through.
-    final sigBuf = StringBuffer()..write(progressSource)..write(';');
+    final sigBuf = StringBuffer()
+      ..write(progressSource)
+      ..write(';');
     for (final m in raw) {
       sigBuf
         ..write(m['imdbId'])
@@ -9950,7 +9950,10 @@ class _SearchScreenState extends State<SearchScreen>
                                                         ?.hideTitle ??
                                                     false),
                                             progress: rail.cw?.progressOf(item),
-                                            episodeLabel: _railEpisodeLabel(rail, item),
+                                            episodeLabel: _railEpisodeLabel(
+                                              rail,
+                                              item,
+                                            ),
                                             onQuickPlay:
                                                 rail.cw != null || _pikpakOnly
                                                 ? null
@@ -17745,13 +17748,22 @@ class _SearchScreenState extends State<SearchScreen>
       // nav, and this button then switched to a tab that isn't there (dead
       // tap). Re-add once it opens Explore reliably regardless of nav state.
       if (!compact && ProfilePolicyGuard.allowsSync(ProfileFeature.downloads))
-        (label: 'On device', icon: Icons.download_done_rounded, tab: MainTab.downloads),
+        (
+          label: 'On device',
+          icon: Icons.download_done_rounded,
+          tab: MainTab.downloads,
+        ),
       if (!compact && ProfilePolicyGuard.allowsSync(ProfileFeature.cloudFiles))
         (label: 'Cloud files', icon: Icons.cloud_outlined, tab: MainTab.cloud),
     ];
     if (actions.isEmpty) return const SizedBox.shrink();
     return Padding(
-      padding: EdgeInsets.fromLTRB(compact ? 0 : 20, 0, compact ? 0 : 20, compact ? 0 : 8),
+      padding: EdgeInsets.fromLTRB(
+        compact ? 0 : 20,
+        0,
+        compact ? 0 : 20,
+        compact ? 0 : 8,
+      ),
       child: Wrap(
         spacing: 8,
         runSpacing: 6,
@@ -17885,8 +17897,11 @@ class _SearchScreenState extends State<SearchScreen>
         ),
         if (!_searchSheetOpen && !widget.searchPage)
           Positioned(
-            top: topInset + _SpotlightSearchButton.topInset +
-                _SpotlightSearchButton.diameter + 10,
+            top:
+                topInset +
+                _SpotlightSearchButton.topInset +
+                _SpotlightSearchButton.diameter +
+                10,
             right: 20,
             child: _buildHomeJourneyStrip(compact: true),
           ),
@@ -20022,20 +20037,30 @@ class _SearchScreenState extends State<SearchScreen>
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Padding(
-            padding: EdgeInsets.fromLTRB(widget.isTelevision ? 24 : 20, 14, 20, 8),
+            padding: EdgeInsets.fromLTRB(
+              widget.isTelevision ? 24 : 20,
+              14,
+              20,
+              8,
+            ),
             child: Row(
               children: [
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('Explore', style: TextStyle(
-                        fontWeight: FontWeight.w800,
-                        fontSize: widget.isTelevision ? 25 : 22,
-                        color: app.core.tx,
-                      )),
-                      Text('Browse catalogs and connected sources',
-                        style: TextStyle(color: app.fade(app.core.tx, 0.64))),
+                      Text(
+                        'Explore',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w800,
+                          fontSize: widget.isTelevision ? 25 : 22,
+                          color: app.core.tx,
+                        ),
+                      ),
+                      Text(
+                        'Browse catalogs and connected sources',
+                        style: TextStyle(color: app.fade(app.core.tx, 0.64)),
+                      ),
                     ],
                   ),
                 ),

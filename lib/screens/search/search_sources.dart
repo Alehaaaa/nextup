@@ -1149,24 +1149,88 @@ class _SourcesScreenState extends State<_SourcesScreen> {
     _playNow(t, i);
   }
 
-  void _playNow(Torrent t, int i) {
+  /// [playerMode] is a row menu's one-off "Play in …" choice ('debrify' /
+  /// 'external'); null plays in the profile's default player.
+  void _playNow(Torrent t, int i, {String? playerMode}) {
     _freezeStreaming();
+    Future<void> activate() => TorrentPlaybackService.activateTorrent(
+      context,
+      t,
+      // A chosen player means "play", never a download.
+      intent: playerMode == null ? widget.intent : SourceIntent.browse,
+      wantedEpisodes: widget.wantedEpisodes,
+      meta: widget.meta,
+      // The rendered list — [_visible] equals [_torrents] with the redesign
+      // off, but is the source-filtered/sorted list when on, so the index and
+      // the in-player Sources switcher stay in sync with what the user sees.
+      sources: _visible,
+      sourceIndex: i,
+      searchKeyword: widget.selection.title,
+    );
     unawaited(
-      TorrentPlaybackService.activateTorrent(
-        context,
-        t,
-        intent: widget.intent,
-        wantedEpisodes: widget.wantedEpisodes,
-        meta: widget.meta,
-        // The rendered list — [_visible] equals [_torrents] with the redesign
-        // off, but is the source-filtered/sorted list when on, so the index and
-        // the in-player Sources switcher stay in sync with what the user sees.
-        sources: _visible,
-        sourceIndex: i,
-        searchKeyword: widget.selection.title,
-      ).then((_) => _reloadBound()),
+      (playerMode == null
+              ? activate()
+              : VideoPlayerLauncher.withPlayerMode(playerMode, activate))
+          .then((_) => _reloadBound()),
     );
   }
+
+  /// Set while the default player is read, so a second long-press in that
+  /// short gap can't stack a second menu.
+  bool _menuOpening = false;
+
+  /// The player opposite the profile's default, offered for one launch, or
+  /// null when there is none to offer: browser links have no player,
+  /// media-server streams always play in the app (an external app never
+  /// receives their session headers), continuous shuffle needs the in-app
+  /// player, and a profile without external players gets no external offer.
+  Future<({String mode, String label})?> _otherPlayerFor(Torrent t) async {
+    if (widget.bindMode || t.isExternalStream || MediaServerService.owns(t)) {
+      return null;
+    }
+    String defaultMode;
+    try {
+      defaultMode = await StorageService.getDefaultPlayerMode();
+    } catch (_) {
+      // A profile switch mid-read: offer what the built-in default would.
+      defaultMode = 'debrify';
+    }
+    if (defaultMode != 'debrify') {
+      return (mode: 'debrify', label: 'Play in Nextup player');
+    }
+    if (widget.meta.initialContinuousShuffle) return null;
+    final allowed = await ProfilePolicyGuard.allows(
+      ProfileFeature.externalPlayers,
+    );
+    return allowed
+        ? (mode: 'external', label: 'Play in external player')
+        : null;
+  }
+
+  ListTile _otherPlayerTile(
+    BuildContext sheetCtx,
+    AppTheme app,
+    ({String mode, String label}) other,
+    Torrent t,
+    int i,
+  ) => ListTile(
+    leading: Icon(
+      other.mode == 'external'
+          ? Icons.open_in_new_rounded
+          : Icons.smart_display_rounded,
+      color: app.core.tx,
+    ),
+    title: Text(other.label),
+    subtitle: Text(
+      'This play only. Your default player stays the same.',
+      style: TextStyle(color: app.fade(app.core.tx, 0.5)),
+    ),
+    onTap: () {
+      DialogTapGuard.markKeyAction();
+      Navigator.of(sheetCtx).pop();
+      _playNow(t, i, playerMode: other.mode);
+    },
+  );
 
   void _snack(String message) {
     if (!mounted) return;
@@ -1286,12 +1350,20 @@ class _SourcesScreenState extends State<_SourcesScreen> {
   }
 
   void _showRowMenu(Torrent t, int i) {
+    if (_menuOpening) return;
+    _menuOpening = true;
     _freezeStreaming();
+    unawaited(_openRowMenu(t, i).whenComplete(() => _menuOpening = false));
+  }
+
+  Future<void> _openRowMenu(Torrent t, int i) async {
+    final otherPlayer = await _otherPlayerFor(t);
+    if (!mounted) return;
     // Direct / external addon streams have no infohash to pin — offer the
     // stream-appropriate actions (play/open + copy link), mirroring Home's
     // direct-stream action sheet.
     if (t.isDirectStream || t.isExternalStream) {
-      _showStreamRowMenu(t, i);
+      _showStreamRowMenu(t, i, otherPlayer);
       return;
     }
     final app = AppThemeScope.of(context);
@@ -1304,55 +1376,61 @@ class _SourcesScreenState extends State<_SourcesScreen> {
           ? GlassChrome.fill(app, raised: true)
           : app.home.sheetBg,
       shape: GlassChrome.enabled(app) ? GlassChrome.shape(app) : null,
+      // Scrolls so every action fits a landscape phone's short sheet.
+      isScrollControlled: true,
       builder: (sheetCtx) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              leading: Icon(Icons.play_arrow_rounded, color: app.core.tx),
-              title: const Text('Play'),
-              onTap: () {
-                DialogTapGuard.markKeyAction();
-                Navigator.of(sheetCtx).pop();
-                _playNow(t, i);
-              },
-            ),
-            ListTile(
-              leading: Icon(
-                bound ? Icons.link_off_rounded : Icons.link_rounded,
-                color: const Color(0xFFF59E0B),
-              ),
-              title: Text(bound ? 'Unpin source' : 'Pin as source'),
-              subtitle: Text(
-                bound
-                    ? 'Stop reusing this source'
-                    : 'Reuse this source for instant playback',
-                style: TextStyle(color: app.fade(app.core.tx, 0.5)),
-              ),
-              onTap: () {
-                DialogTapGuard.markKeyAction();
-                Navigator.of(sheetCtx).pop();
-                if (bound) {
-                  unawaited(_unpin(binding));
-                } else {
-                  unawaited(_pin(t));
-                }
-              },
-            ),
-            if (_canCopySource(t))
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
               ListTile(
-                leading: const Icon(
-                  Icons.copy_rounded,
-                  color: Color(0xFFF59E0B),
-                ),
-                title: const Text('Copy link'),
+                leading: Icon(Icons.play_arrow_rounded, color: app.core.tx),
+                title: const Text('Play'),
                 onTap: () {
                   DialogTapGuard.markKeyAction();
                   Navigator.of(sheetCtx).pop();
-                  unawaited(_copySourceLink(t));
+                  _playNow(t, i);
                 },
               ),
-          ],
+              if (otherPlayer != null)
+                _otherPlayerTile(sheetCtx, app, otherPlayer, t, i),
+              ListTile(
+                leading: Icon(
+                  bound ? Icons.link_off_rounded : Icons.link_rounded,
+                  color: const Color(0xFFF59E0B),
+                ),
+                title: Text(bound ? 'Unpin source' : 'Pin as source'),
+                subtitle: Text(
+                  bound
+                      ? 'Stop reusing this source'
+                      : 'Reuse this source for instant playback',
+                  style: TextStyle(color: app.fade(app.core.tx, 0.5)),
+                ),
+                onTap: () {
+                  DialogTapGuard.markKeyAction();
+                  Navigator.of(sheetCtx).pop();
+                  if (bound) {
+                    unawaited(_unpin(binding));
+                  } else {
+                    unawaited(_pin(t));
+                  }
+                },
+              ),
+              if (_canCopySource(t))
+                ListTile(
+                  leading: const Icon(
+                    Icons.copy_rounded,
+                    color: Color(0xFFF59E0B),
+                  ),
+                  title: const Text('Copy link'),
+                  onTap: () {
+                    DialogTapGuard.markKeyAction();
+                    Navigator.of(sheetCtx).pop();
+                    unawaited(_copySourceLink(t));
+                  },
+                ),
+            ],
+          ),
         ),
       ),
     );
@@ -1360,7 +1438,11 @@ class _SourcesScreenState extends State<_SourcesScreen> {
 
   /// Options sheet for a direct / external addon stream. Playable direct links
   /// can be pinned by addon provenance; external browser links remain open-only.
-  void _showStreamRowMenu(Torrent t, int i) {
+  void _showStreamRowMenu(
+    Torrent t,
+    int i,
+    ({String mode, String label})? otherPlayer,
+  ) {
     final app = AppThemeScope.of(context);
     final external = t.isExternalStream;
     final binding = _bindingFor(t);
@@ -1393,6 +1475,8 @@ class _SourcesScreenState extends State<_SourcesScreen> {
                 _playNow(t, i);
               },
             ),
+            if (otherPlayer != null)
+              _otherPlayerTile(sheetCtx, app, otherPlayer, t, i),
             if (!external)
               ListTile(
                 leading: Icon(

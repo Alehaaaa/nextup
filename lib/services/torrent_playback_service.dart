@@ -6984,7 +6984,11 @@ class TorrentPlaybackService {
       // so, play in DeoVR instead of the in-app player. Scoped to keyword so this
       // shared launcher doesn't newly divert catalog board plays. Packs keep the
       // normal player (DeoVR takes one video).
-      if (meta == null && !r.hasPlaylist && await _shouldUseDeoVR(title)) {
+      // An explicit one-off player choice outranks the VR redirect.
+      if (VideoPlayerLauncher.playerModeOverride == null &&
+          meta == null &&
+          !r.hasPlaylist &&
+          await _shouldUseDeoVR(title)) {
         // DeoVR runs its own dialog flow — drop the loader before it.
         overlay?.dismiss();
         if (!context.mounted) return;
