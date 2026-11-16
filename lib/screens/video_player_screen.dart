@@ -22,6 +22,7 @@ import 'package:flutter/services.dart';
 import '../services/player_display_controls.dart';
 import '../services/player_controls_display_settings.dart';
 import '../services/player_gesture_settings.dart';
+import '../services/startup_hold_watch.dart';
 import '../services/system_volume.dart';
 import 'package:synchronized/synchronized.dart';
 
@@ -4060,6 +4061,8 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
             isStremioTv && initialUrl.isNotEmpty && !widget.startFromRandom;
         var directOpenCompleted = false;
         int? directOpenEpoch;
+        var validatedOpen = false;
+        StartupHoldWatch? holdWatch;
         try {
           final opened = await StartupStreamPolicy.openInitialMedia(
             hasResolvedUrl: initialUrl.isNotEmpty,
@@ -4093,26 +4096,38 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
               await opening;
               directOpenCompleted = true;
             },
-            openValidated: () => _openInitialVodWithFailover(
-              initialUrl,
-              httpHeaders: _activeHttpHeaders,
-              initialAttemptAlreadyFailed: initialRankedAttemptFailed,
-            ),
+            openValidated: () {
+              validatedOpen = true;
+              return _openInitialVodWithFailover(
+                initialUrl,
+                httpHeaders: _activeHttpHeaders,
+                initialAttemptAlreadyFailed: initialRankedAttemptFailed,
+              );
+            },
           );
           if (!opened) {
             await _reportStartupFailure();
             return;
+          }
+          // Only the validated path holds the gate through the steps below.
+          if (validatedOpen) {
+            holdWatch = StartupHoldWatch(
+              isCurrent: () => mounted && !_screenDisposed,
+            );
           }
           // Wait for duration-dependent resume and random-start calculations.
           await _waitForVideoReady();
           if (!mounted ||
               _screenDisposed ||
               (isStremioTv && _stremioTvStartupWatch?.hasFailed == true)) {
+            holdWatch?.release();
             return;
           }
           if (hasExternalAudio) {
+            holdWatch?.stage(StartupHoldStage.externalAudio);
             await _setExternalAudioTrack(widget.audioUrl!);
           }
+          holdWatch?.stage(StartupHoldStage.resume);
           // Random start takes precedence over resume, then startAtPercent.
           if (widget.startFromRandom) {
             final offset = _randomStartOffset(_duration);
@@ -4136,14 +4151,18 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
             await _maybeRestoreResume(verifyLanding: true);
           }
           _scheduleAutoHide();
+          holdWatch?.stage(StartupHoldStage.trackRestore);
           await _restoreTrackPreferences();
+          holdWatch?.stage(StartupHoldStage.play);
           if (hasExternalAudio) await _player.play();
           // The candidate is now decoded, resume has been applied, and track
           // restoration is complete. Only now may progress escape to local
           // completion or remote scrobblers.
           _setStartupGateActive(false);
+          holdWatch?.release();
           _resumeTrackingAfterValidationGate();
         } catch (e) {
+          holdWatch?.release();
           if (isStremioTv &&
               !directOpenCompleted &&
               directOpenEpoch == _resumeVerifyEpoch) {

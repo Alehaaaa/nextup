@@ -108,6 +108,7 @@ import '../services/downloads/download_coordinator.dart';
 import '../services/downloads/download_feedback.dart';
 import '../services/downloads/download_request.dart';
 import '../utils/filter_ladder.dart' show FilterLadder;
+import '../services/source_search_scope.dart';
 import '../services/storage_service.dart';
 import '../services/tv_hero_artwork_quality_controller.dart';
 import '../services/tvos_top_shelf_service.dart';

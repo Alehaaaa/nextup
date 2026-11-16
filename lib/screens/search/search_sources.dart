@@ -832,6 +832,21 @@ class _SourcesScreenState extends State<_SourcesScreen> {
               originAddonKey: sel.stremioAddonKey,
               originVideoId: originVideoId,
             );
+      if (!customEpisodeUnavailable &&
+          widget.searchOverride == null &&
+          !_keywordMode) {
+        // Privacy-safe record of what this search did: labels and counts only.
+        SourceSearchScope.log(
+          surface: 'sources',
+          imdbId: sel.imdbId,
+          isMovie: !sel.isSeries,
+          season: sel.season,
+          episode: sel.episode,
+          contentType: sel.contentType,
+          originVideoId: originVideoId,
+          result: res,
+        );
+      }
       final iptv = iptvSearch == null ? <IptvSourceResult>[] : await iptvSearch;
       if (!mounted || token != _searchToken) return;
       _iptvSources = iptv;
