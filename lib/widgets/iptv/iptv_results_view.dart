@@ -4,6 +4,7 @@ import 'dart:io' show Platform;
 import 'dart:math' as math;
 import 'dart:ui' as ui;
 
+import 'package:debrify/widgets/iptv/multi_view_launcher.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/foundation.dart'
     show
@@ -6307,6 +6308,10 @@ class IptvResultsViewState extends State<IptvResultsView>
         : null;
     final canSave = channel.contentType != 'series';
     final isFavorited = _favoriteUrls.contains(channel.url);
+    final multiView = MultiViewLauncher.eligible(channel);
+    final inMultiView =
+        multiView && MultiViewLauncher.contains(context, channel);
+    final multiViewCount = multiView ? MultiViewLauncher.count(context) : 0;
     await showDialog<void>(
       context: context,
       barrierColor: Colors.black.withValues(alpha: 0.68),
@@ -6404,6 +6409,37 @@ class IptvResultsViewState extends State<IptvResultsView>
                   icon: Icons.calendar_month_rounded,
                   label: 'Full guide',
                   onPressed: () => _openSchedulePane(channel),
+                ),
+              if (multiView)
+                nextTile(
+                  icon: inMultiView
+                      ? Icons.grid_off_rounded
+                      : Icons.grid_view_rounded,
+                  label: inMultiView
+                      ? 'Remove from multi-view'
+                      : 'Add to multi-view',
+                  onPressed: () => inMultiView
+                      ? MultiViewLauncher.remove(context, channel)
+                      : MultiViewLauncher.add(
+                          context,
+                          channel,
+                          play: _playChannel,
+                        ),
+                ),
+              if (multiViewCount > 0)
+                nextTile(
+                  icon: Icons.window_rounded,
+                  label: 'Open multi-view ($multiViewCount)',
+                  onPressed: () => unawaited(
+                    MultiViewLauncher.open(
+                      context,
+                      play: _playChannel,
+                      // Back from the grid: the cursor lands on the channel
+                      // that had the sound.
+                      onClosed: (channel) =>
+                          unawaited(_scrollAndFocusStartupRow(channel)),
+                    ),
+                  ),
                 ),
             ],
           ),

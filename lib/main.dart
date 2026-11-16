@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'services/addon_auto_update_scheduler.dart';
+import 'widgets/iptv/multi_view_launcher.dart';
 import 'services/torrent_playback_service.dart';
 import 'services/webdav_sync/webdav_log_upload.dart';
 import 'services/cache_scratch_cleanup.dart';
@@ -1156,6 +1157,7 @@ class _DebrifyAppState extends State<DebrifyApp> {
         // services that already own them.
         content = ProviderScope(
           retry: (count, error) => null,
+          overrides: multiViewAppOverrides(),
           child: content,
         );
         // Pointer input counts as presence too — an Apple TV remote's
