@@ -3306,8 +3306,7 @@ class _UniverseCardState extends State<_UniverseCard> {
 
 /// Trivia / goofs / quotes as reading cards — the page's footnote band.
 /// Cards are focusable so the ladder can park on them (and the rail can
-/// scroll), but SELECT is deliberately inert in v1: this is ambient reading,
-/// like the synopsis.
+/// scroll). A card cuts a long entry off, so OK or a click opens it in full.
 class ShowcaseDidYouKnow extends StatelessWidget {
   final List<DidYouKnowEntry> entries;
 
@@ -3368,65 +3367,197 @@ class _DykCardState extends State<_DykCard> {
     final m = ShowcaseMetrics.of(context);
     final e = widget.entry;
     final quote = e.kind == 'Quote';
+    void open() => _showDidYouKnowReader(context, kind: e.kind, text: e.text);
     return Focus(
       focusNode: widget.node,
       onFocusChange: (v) {
         setState(() => _f = v);
         if (v) _keepVisible(context);
       },
-      // Basic cursor: ambient reading, SELECT is deliberately inert.
-      child: _Hover(
-        cursor: MouseCursor.defer,
-        builder: (context, hovered) => Align(
-          child: ParallaxFocus(
-            focused: _f || hovered,
-            radius: BorderRadius.circular(7 * m.k),
-            child: Container(
-              width: m.dykW,
-              height: m.dykH,
-              padding: EdgeInsets.fromLTRB(
-                m.compact ? 15 : 13 * m.k,
-                m.compact ? 13 : 11 * m.k,
-                m.compact ? 15 : 13 * m.k,
-                m.compact ? 13 : 11 * m.k,
-              ),
-              decoration: BoxDecoration(
-                color: _ink.withValues(alpha: _f || hovered ? 0.11 : 0.07),
-                border: Border.all(color: _ink.withValues(alpha: 0.09)),
-                borderRadius: BorderRadius.circular(7 * m.k),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    e.kind.toUpperCase(),
-                    style: _t(
-                      m.compact ? 10 : 7.5 * m.k,
-                      w: FontWeight.w700,
-                      a: 0.42,
-                    ).copyWith(letterSpacing: 1.2),
+      onKeyEvent: (_, event) => _activate(event, open),
+      child: Semantics(
+        button: true,
+        child: GestureDetector(
+          onTap: open,
+          behavior: HitTestBehavior.opaque,
+          child: _Hover(
+            cursor: SystemMouseCursors.click,
+            builder: (context, hovered) => Align(
+              child: ParallaxFocus(
+                focused: _f || hovered,
+                radius: BorderRadius.circular(7 * m.k),
+                child: Container(
+                  width: m.dykW,
+                  height: m.dykH,
+                  padding: EdgeInsets.fromLTRB(
+                    m.compact ? 15 : 13 * m.k,
+                    m.compact ? 13 : 11 * m.k,
+                    m.compact ? 15 : 13 * m.k,
+                    m.compact ? 13 : 11 * m.k,
                   ),
-                  SizedBox(height: m.compact ? 8 : 6),
+                  decoration: BoxDecoration(
+                    color: _ink.withValues(alpha: _f || hovered ? 0.11 : 0.07),
+                    border: Border.all(color: _ink.withValues(alpha: 0.09)),
+                    borderRadius: BorderRadius.circular(7 * m.k),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        e.kind.toUpperCase(),
+                        style: _t(
+                          m.compact ? 10 : 7.5 * m.k,
+                          w: FontWeight.w700,
+                          a: 0.42,
+                        ).copyWith(letterSpacing: 1.2),
+                      ),
+                      SizedBox(height: m.compact ? 8 : 6),
+                      Expanded(
+                        child: Text(
+                          quote ? '“${e.text}”' : e.text,
+                          maxLines: m.compact ? 6 : 7,
+                          overflow: TextOverflow.ellipsis,
+                          style:
+                              _t(
+                                m.compact ? 12.5 : 9.5 * m.k,
+                                a: quote ? 0.88 : 0.8,
+                              ).copyWith(
+                                height: 1.5,
+                                fontStyle: quote
+                                    ? FontStyle.italic
+                                    : FontStyle.normal,
+                              ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Opens one trivia, goof or quote in full. The rail's cards cut long entries
+/// off, and on a TV there was no way to read the rest.
+///
+/// UP/DOWN scroll a long entry, OK or Back closes, and focus returns to the
+/// card that opened it.
+///
+/// [kind] is the card's eyebrow ('Trivia', 'Goof' or 'Quote').
+Future<void> _showDidYouKnowReader(
+  BuildContext context, {
+  required String kind,
+  required String text,
+}) => showDialog<void>(
+  context: context,
+  builder: (_) => _DidYouKnowReader(kind: kind, text: text),
+);
+
+class _DidYouKnowReader extends StatelessWidget {
+  final String kind;
+  final String text;
+
+  const _DidYouKnowReader({required this.kind, required this.text});
+
+  static const _step = 96.0;
+
+  // The focus sits inside the scroll view, so it scrolls the list it is in
+  // rather than owning a controller.
+  static KeyEventResult _onKey(FocusNode node, KeyEvent event) {
+    if (event is! KeyDownEvent && event is! KeyRepeatEvent) {
+      return KeyEventResult.ignored;
+    }
+    final key = event.logicalKey;
+    final context = node.context;
+    if (context == null) return KeyEventResult.ignored;
+    if (key == LogicalKeyboardKey.arrowUp ||
+        key == LogicalKeyboardKey.arrowDown) {
+      final position = Scrollable.maybeOf(context)?.position;
+      if (position == null) return KeyEventResult.handled;
+      final delta = key == LogicalKeyboardKey.arrowDown ? _step : -_step;
+      final target = (position.pixels + delta).clamp(
+        position.minScrollExtent,
+        position.maxScrollExtent,
+      );
+      position.animateTo(
+        target,
+        duration: const Duration(milliseconds: 140),
+        curve: Curves.easeOut,
+      );
+      return KeyEventResult.handled;
+    }
+    if (event is KeyDownEvent) {
+      return _activate(event, () => Navigator.of(context).pop());
+    }
+    return KeyEventResult.ignored;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final app = AppThemeScope.of(context);
+    final quote = kind == 'Quote';
+    final height = MediaQuery.sizeOf(context).height;
+    return Dialog(
+      backgroundColor: Color.lerp(app.home.bg, app.core.tx, 0.07),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: _ink.withValues(alpha: 0.12)),
+      ),
+      child: ConstrainedBox(
+        constraints: BoxConstraints(maxWidth: 640, maxHeight: height * 0.75),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(24, 20, 24, 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
                   Expanded(
                     child: Text(
-                      quote ? '“${e.text}”' : e.text,
-                      maxLines: m.compact ? 6 : 7,
-                      overflow: TextOverflow.ellipsis,
-                      style:
-                          _t(
-                            m.compact ? 12.5 : 9.5 * m.k,
-                            a: quote ? 0.88 : 0.8,
-                          ).copyWith(
-                            height: 1.5,
-                            fontStyle: quote
-                                ? FontStyle.italic
-                                : FontStyle.normal,
-                          ),
+                      kind.toUpperCase(),
+                      style: _t(
+                        12,
+                        w: FontWeight.w700,
+                        a: 0.5,
+                      ).copyWith(letterSpacing: 1.4),
+                    ),
+                  ),
+                  // For pointers only: the reader itself holds focus, and
+                  // OK or Back close it from a remote.
+                  ExcludeFocus(
+                    child: IconButton(
+                      tooltip: 'Close',
+                      onPressed: () => Navigator.of(context).pop(),
+                      icon: Icon(
+                        Icons.close_rounded,
+                        color: _ink.withValues(alpha: 0.7),
+                      ),
                     ),
                   ),
                 ],
               ),
-            ),
+              const SizedBox(height: 8),
+              Flexible(
+                child: SingleChildScrollView(
+                  child: Focus(
+                    autofocus: true,
+                    onKeyEvent: _onKey,
+                    child: Text(
+                      quote ? '“$text”' : text,
+                      style: _t(16, a: quote ? 0.9 : 0.85).copyWith(
+                        height: 1.55,
+                        fontStyle: quote ? FontStyle.italic : FontStyle.normal,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
       ),
