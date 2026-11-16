@@ -12,7 +12,7 @@
 <p align="center">
   <a href="https://github.com/Alehaaaa/debrify/releases/latest"><img src="https://img.shields.io/github/v/release/Alehaaaa/debrify?include_prereleases&style=flat-square&color=6366f1" alt="Latest release"></a>
   <a href="https://github.com/Alehaaaa/debrify/releases"><img src="https://img.shields.io/github/downloads/Alehaaaa/debrify/total?style=flat-square&color=22c55e" alt="Downloads"></a>
-  <a href="https://github.com/Alehaaaa/debrify/commits/nextup"><img src="https://img.shields.io/github/last-commit/Alehaaaa/debrify/nextup?style=flat-square&color=f59e0b" alt="Last commit"></a>
+  <a href="https://github.com/Alehaaaa/debrify/commits/main"><img src="https://img.shields.io/github/last-commit/Alehaaaa/debrify/main?style=flat-square&color=f59e0b" alt="Last commit"></a>
   <img src="https://img.shields.io/badge/Flutter-3.8+-02569B?style=flat-square&logo=flutter&logoColor=white" alt="Flutter">
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-AGPL--3.0-blue?style=flat-square" alt="GNU AGPL v3"></a>
 </p>
@@ -37,7 +37,7 @@
 
 Debrify is an open-source, cross-platform **media hub** by Varun Salian and contributors. It brings the services you already use — cloud storage accounts, personal WebDAV servers, IPTV playlists, Stremio addon catalogs, YouTube — into one place, with a built-in player tuned for movies and TV, a download manager, Trakt/Simkl/MDBList tracking, and a UI that works on a phone, a desktop, or a TV with a remote.
 
-Nextup keeps all of that and tracks upstream on the `nextup` branch, layering the changes below on top.
+Nextup keeps all of that and tracks upstream on the `main` branch, layering the changes below on top.
 
 ## ✨ What's different in Nextup
 
@@ -181,7 +181,7 @@ flutter build linux --release             # Linux
 TMDB metadata needs a read-access token passed at build time (`--dart-define-from-file`, with `TMDB_READ_ACCESS_TOKEN` and optionally `OMDB_API_KEY`); without it the app builds but metadata is disabled. To install a second copy alongside the normal one, see [Personal build](docs/PERSONAL_BUILD.md).
 
 ### Branches
-- **`nextup`** — Nextup's main branch; upstream is merged in regularly
+- **`main`** — Nextup's main branch; upstream is merged in regularly
 - **`sidestore`** — generated; holds the SideStore/AltStore source, don't commit to it
 
 ### A note on the code

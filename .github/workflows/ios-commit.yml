@@ -1,7 +1,7 @@
 name: iOS Commit Build
 
-# Builds a sideloadable IPA for every pushed commit. Commits on the default
-# branch each get their own pre-release, while the SideStore/AltStore source
+# Builds a sideloadable IPA for every pushed commit. Commits on the release
+# branch (`main`) each get their own pre-release, while the SideStore/AltStore source
 # lives on the `sidestore` branch,
 # reachable at:
 #   https://raw.githubusercontent.com/<owner>/<repo>/sidestore/apps.json
@@ -10,7 +10,7 @@ name: iOS Commit Build
 
 on:
   push:
-    branches: [nextup, main]
+    branches: [main]
     # Docs-only commits change nothing in the app.
     paths-ignore: ['**.md', 'docs/**', 'LICENSE']
   workflow_dispatch:
@@ -18,11 +18,13 @@ on:
 permissions:
   contents: write
 
-# Preserve all default-branch builds: each must finish publishing its own
+# Preserve all release-branch builds: each must finish publishing its own
 # iOS release and SideStore source. Supersede in-flight feature-branch builds.
+# The release branch is named explicitly rather than read from the repository's
+# default-branch setting, so publishing does not depend on that setting.
 concurrency:
-  group: ios-commit-${{ github.ref_name == github.event.repository.default_branch && github.sha || github.ref }}
-  cancel-in-progress: ${{ github.ref_name != github.event.repository.default_branch }}
+  group: ios-commit-${{ github.ref_name == 'main' && github.sha || github.ref }}
+  cancel-in-progress: ${{ github.ref_name != 'main' }}
 
 env:
   SOURCE_BRANCH: sidestore
@@ -144,7 +146,7 @@ jobs:
 
     - name: Publish commit release and SideStore source
       id: publish
-      if: github.ref_name == github.event.repository.default_branch
+      if: github.ref_name == 'main'
       env:
         GH_TOKEN: ${{ github.token }}
         IPA_NAME: ${{ steps.ipa.outputs.name }}
