@@ -20,6 +20,7 @@ import '../utils/app_storage.dart';
 import 'package:window_manager/window_manager.dart';
 import 'package:flutter/services.dart';
 import '../services/player_display_controls.dart';
+import '../services/player_controls_display_settings.dart';
 import '../services/system_volume.dart';
 import 'package:synchronized/synchronized.dart';
 
@@ -1726,6 +1727,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
     );
     ProfileRuntime.scope.addListener(_onPlayerMetadataPolicyChanged);
     unawaited(GlassTokens.load());
+    unawaited(PlayerControlsDisplaySettings.load());
     _controlsVisible.addListener(_syncGlassProbe);
     _continuousShuffleEnabled = widget.initialContinuousShuffle;
     _activeHttpHeaders = widget.httpHeaders;
@@ -16551,6 +16553,9 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
                                     );
                                     _player.seek(newPos);
                                     _lastSliderSeekPos = newPos;
+                                    // A held pointer sends no hover: nothing
+                                    // else keeps the dock up during a drag.
+                                    _scheduleAutoHide();
                                   },
                                   onSeekBackward: () => _seekRelative(false),
                                   onSeekForward: () => _seekRelative(true),

@@ -9,6 +9,8 @@ import 'dart:ui' show ImageFilter;
 
 import 'package:flutter/material.dart';
 
+import '../../../services/player_controls_display_settings.dart';
+import '../services/playback_ui_clock.dart';
 import 'dock_style.dart';
 import '../../../theme/app_motion.dart' show kMenuSheetAnimation;
 
@@ -685,4 +687,72 @@ class GradientSliderTrackShape extends SliderTrackShape
         ).createShader(played),
     );
   }
+}
+
+/// `46:20`, or `1:08:00` past the hour.
+String dockClockText(Duration d) {
+  final h = d.inHours;
+  final m = d.inMinutes.remainder(60).toString().padLeft(2, '0');
+  final s = d.inSeconds.remainder(60).toString().padLeft(2, '0');
+  return h > 0 ? '$h:$m:$s' : '$m:$s';
+}
+
+/// The duration readout; tapping it switches between the total and the time
+/// left, and the choice is kept for the profile.
+class DockDurationReadout extends StatelessWidget {
+  const DockDurationReadout({
+    super.key,
+    required this.value,
+    required this.metrics,
+    required this.style,
+    this.prefix = '',
+  });
+
+  final PlaybackUiClockValue value;
+  final DockMetrics metrics;
+  final TextStyle style;
+  final String prefix;
+
+  /// The total (`46:20`) or the time left (`-42:55`). No "-00:00" before the
+  /// duration is known.
+  static String text(PlaybackUiClockValue value, bool remaining) {
+    if (!remaining || value.duration <= Duration.zero) {
+      return dockClockText(value.duration);
+    }
+    final left = value.duration - value.position;
+    return '-${dockClockText(left.isNegative ? Duration.zero : left)}';
+  }
+
+  @override
+  Widget build(BuildContext context) => ValueListenableBuilder<bool>(
+    valueListenable: PlayerControlsDisplaySettings.showRemaining,
+    builder: (context, remaining, _) => Semantics(
+      container: true,
+      button: true,
+      onTapHint: remaining ? 'Show total time' : 'Show time left',
+      child: MouseRegion(
+        cursor: SystemMouseCursors.click,
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: PlayerControlsDisplaySettings.toggleRemaining,
+          // The text alone is a sliver beside the seek bar: this keeps the
+          // dock's minimum target, and the gap before it counts as its width.
+          child: ConstrainedBox(
+            constraints: BoxConstraints(minHeight: metrics.target),
+            child: Padding(
+              padding: EdgeInsetsDirectional.only(start: metrics.gap),
+              child: Center(
+                widthFactor: 1,
+                child: Text(
+                  '$prefix${text(value, remaining)}',
+                  maxLines: 1,
+                  style: style,
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    ),
+  );
 }

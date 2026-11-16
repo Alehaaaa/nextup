@@ -5,6 +5,7 @@ import 'package:file_picker/file_picker.dart';
 import '../../utils/file_pick.dart';
 import '../../services/external_player_service.dart';
 import '../../services/storage_service.dart';
+import '../../services/player_controls_display_settings.dart';
 import '../../services/android_native_downloader.dart';
 import '../../services/subtitle_font_service.dart';
 import '../../services/skip_segment_service.dart';
@@ -493,6 +494,7 @@ class _ExternalPlayerSettingsPageState
     });
 
     try {
+      await PlayerControlsDisplaySettings.load();
       // Load default player mode
       final mode = await StorageService.getDefaultPlayerMode();
 
@@ -2318,6 +2320,26 @@ class _ExternalPlayerSettingsPageState
 
       if (_defaultPlayerMode == 'debrify') ...[
         const SizedBox(height: 16),
+        // Off TV: a TV's player has its own controls.
+        if (!PlatformUtil.isTelevision) ...[
+          _defaultsCard(
+            'Player controls',
+            'How the buttons under the progress bar look',
+            [
+              ValueListenableBuilder<bool>(
+                valueListenable: PlayerControlsDisplaySettings.iconOnly,
+                builder: (context, iconOnly, _) => _buildCheckboxTile(
+                  context,
+                  title: 'Icons only',
+                  subtitle: 'Hide the labels under the player buttons',
+                  value: iconOnly,
+                  onChanged: PlayerControlsDisplaySettings.setIconOnly,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+        ],
         if (PlatformUtil.isPhone) ...[
           _defaultsCard(
             'When playback starts',
