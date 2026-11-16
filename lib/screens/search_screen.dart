@@ -1674,11 +1674,7 @@ class _SearchScreenState extends State<SearchScreen>
   /// the generic ordering projection to append them at the bottom. Any MDBList
   /// id already saved keeps its chosen position untouched.
   List<String> get _effectiveHomeRowOrder => HomeRowOrder.seedCollections(
-    HomeRowOrder.insertMissingAfter(
-      _homeRowOrder,
-      additions: const ['mdblist:movies', 'mdblist:shows'],
-      anchors: const ['simkl:movies', 'simkl:shows'],
-    ),
+    HomeRowOrder.seedNewRows(_homeRowOrder),
     [
       for (final c in _homeCollections)
         if (c.pinToTop) HomeCollectionRowIds.collection(c.id),
@@ -2623,6 +2619,7 @@ class _SearchScreenState extends State<SearchScreen>
           traktChoice: row.traktChoice,
           simklList: row.simklList,
           mdblistList: row.mdblistList,
+          airing: row.airing,
         );
       }
       return CatalogSection(
@@ -5443,6 +5440,20 @@ class _SearchScreenState extends State<SearchScreen>
       return;
     }
     if (section is HomeListSection) {
+      final airing = section.airing;
+      if (airing != null) {
+        // Open at the upcoming episode, the way the Calendar does.
+        final next = airing.episodes[item.id];
+        _openItem(
+          item,
+          _addonForContinue(null),
+          isTraktSource: airing.fromTrakt,
+          heroTag: heroTag,
+          initialSeason: next?.season,
+          initialEpisode: next?.episode,
+        );
+        return;
+      }
       if (section.simklList != null) {
         _openSimklItem(item, heroTag: heroTag);
         return;
@@ -5459,6 +5470,24 @@ class _SearchScreenState extends State<SearchScreen>
     _openItem(item, section.addon, heroTag: heroTag);
   }
 
+  /// The "Fri · S2E5" badge for an "Airing soon" card; null on other rows.
+  String? _airingBadge(CatalogSection section, StremioMeta item) =>
+      section is HomeListSection
+      ? section.airing?.episodes[item.id]?.label
+      : null;
+
+  /// A stage rail card's badge: the CW episode, or the "Airing soon" one.
+  String? _railEpisodeLabel(_CanvasRail rail, StremioMeta item) =>
+      rail.cw?.episodeOf(item) ??
+      (rail.sectionIndex == null
+          ? null
+          : _airingBadge(_sections[rail.sectionIndex!], item));
+
+  /// Whether the row has a See-All screen. "Airing soon" has none: the
+  /// Calendar tab is its full view.
+  bool _sectionHasSeeAll(CatalogSection section) =>
+      !(section is HomeListSection && section.isAiring);
+
   /// Quick-play counterpart to [_sectionOpenItem]. Trakt rows go through
   /// [_playTraktItem] (CW-cached resume, else catalog play with Trakt-first
   /// resume); Simkl rows play plainly like Discover's lists.
@@ -5473,7 +5502,10 @@ class _SearchScreenState extends State<SearchScreen>
       return;
     }
     if (section is HomeListSection) {
-      if (section.isTrakt) {
+      if (section.isAiring) {
+        // Its episode hasn't aired yet: there is nothing to play.
+        _sectionOpenItem(section, item);
+      } else if (section.isTrakt) {
         _playTraktItem(item);
       } else if (section.isMdblist) {
         _onCatalogPlay(
@@ -8883,6 +8915,31 @@ class _SearchScreenState extends State<SearchScreen>
         ],
       );
     }
+    if (section is HomeListSection && section.isAiring) {
+      // "Airing soon": each card names its next episode, opens at it, and the
+      // row has no See-All (the Calendar tab is its full view).
+      return SpotlightShelf(
+        id: railKey,
+        title: section.title,
+        tag: _catalogSourceTag(section),
+        nodes: i < _rowNodes.length ? _rowNodes[i] : const [],
+        captions: true,
+        items: [
+          for (final m in section.items)
+            SpotlightCard(
+              metadata: m,
+              image: _homeLandscapeCards ? _wideArtUrl(m) : m.poster,
+              fallbackImage: _homeLandscapeCards ? m.poster : null,
+              title: m.name,
+              subtitle: _airingBadge(section, m),
+              shape: _homeLandscapeCards
+                  ? SpotlightCardShape.wide
+                  : SpotlightCardShape.poster,
+              onOpen: () => _sectionOpenItem(section, m),
+            ),
+        ],
+      );
+    }
     return SpotlightShelf(
       id: railKey,
       title: _sections[i].title,
@@ -9893,9 +9950,7 @@ class _SearchScreenState extends State<SearchScreen>
                                                         ?.hideTitle ??
                                                     false),
                                             progress: rail.cw?.progressOf(item),
-                                            episodeLabel: rail.cw?.episodeOf(
-                                              item,
-                                            ),
+                                            episodeLabel: _railEpisodeLabel(rail, item),
                                             onQuickPlay:
                                                 rail.cw != null || _pikpakOnly
                                                 ? null
@@ -10384,7 +10439,7 @@ class _SearchScreenState extends State<SearchScreen>
           !(_stageCollection(rail)?.folderOf(item)?.hideTitle ?? false),
       restVeil: _kPromRestVeil,
       progress: rail.cw?.progressOf(item),
-      episodeLabel: rail.cw?.episodeOf(item),
+      episodeLabel: _railEpisodeLabel(rail, item),
       onQuickPlay: rail.cw != null || _pikpakOnly
           ? null
           : () => _sectionQuickPlay(_sections[rail.sectionIndex!], item),
@@ -10883,7 +10938,7 @@ class _SearchScreenState extends State<SearchScreen>
                                     )?.folderOf(items[col])?.hideTitle ??
                                     false),
                             progress: rail.cw?.progressOf(items[col]),
-                            episodeLabel: rail.cw?.episodeOf(items[col]),
+                            episodeLabel: _railEpisodeLabel(rail, items[col]),
                             onQuickPlay: rail.cw != null || _pikpakOnly
                                 ? null
                                 : () => _sectionQuickPlay(
@@ -11267,7 +11322,7 @@ class _SearchScreenState extends State<SearchScreen>
         hasBoundSource: _isBound(item),
         ringColor: Colors.white,
         progress: rail.cw?.progressOf(item),
-        episodeLabel: rail.cw?.episodeOf(item),
+        episodeLabel: _railEpisodeLabel(rail, item),
         onQuickPlay: rail.cw != null || _pikpakOnly
             ? null
             : () => _sectionQuickPlay(_sections[rail.sectionIndex!], item),
@@ -11696,7 +11751,7 @@ class _SearchScreenState extends State<SearchScreen>
       showTitleOverlay:
           !(_stageCollection(rail)?.folderOf(item)?.hideTitle ?? false),
       progress: rail.cw?.progressOf(item),
-      episodeLabel: rail.cw?.episodeOf(item),
+      episodeLabel: _railEpisodeLabel(rail, item),
       onQuickPlay: rail.cw != null || _pikpakOnly
           ? null
           : () => _sectionQuickPlay(_sections[rail.sectionIndex!], item),
@@ -21608,7 +21663,9 @@ class _SearchScreenState extends State<SearchScreen>
   String _sectionTag(CatalogSection section) {
     if (section is HomeCollectionSection) return 'Collection';
     if (section is HomeListSection) {
-      return section.isTrakt
+      return section.isAiring
+          ? 'Calendar'
+          : section.isTrakt
           ? 'Trakt'
           : section.isMdblist
           ? 'MDBList'
@@ -21648,6 +21705,7 @@ class _SearchScreenState extends State<SearchScreen>
     // semantics) — the catalog browser would try to page them through a
     // placeholder addon that can't serve a catalog endpoint.
     if (section is HomeListSection) {
+      if (section.isAiring) return; // No See-All; see [_sectionHasSeeAll].
       _openListRowSeeAll(section);
       return;
     }
@@ -22064,7 +22122,9 @@ class _SearchScreenState extends State<SearchScreen>
           _railHeader(
             title: section.title,
             tag: _catalogSourceTag(section),
-            onSeeAll: () => _openCatalogSeeAll(section),
+            onSeeAll: _sectionHasSeeAll(section)
+                ? () => _openCatalogSeeAll(section)
+                : null,
           )
         else
           const SizedBox(height: 8),
@@ -22155,6 +22215,7 @@ class _SearchScreenState extends State<SearchScreen>
                             column: col,
                             rowNodes: nodes,
                             hasBoundSource: _isBound(item),
+                            episodeLabel: _airingBadge(section, item),
                             aspectRatio: itemAspect,
                             artUrl: collection != null
                                 ? item.poster

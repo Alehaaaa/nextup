@@ -161,11 +161,7 @@ class _HomeSectionsFilterPageState extends State<HomeSectionsFilterPage> {
   void initState() {
     super.initState();
     _groups = _buildModel();
-    final seededOrder = HomeRowOrder.insertMissingAfter(
-      widget.rowOrder,
-      additions: const ['mdblist:movies', 'mdblist:shows'],
-      anchors: const ['simkl:movies', 'simkl:shows'],
-    );
+    final seededOrder = HomeRowOrder.seedNewRows(widget.rowOrder);
     _orderIds = HomeRowOrder.reconcile(
       HomeRowOrder.seedCollections(seededOrder, [
         for (final c in widget.collections)
@@ -241,6 +237,11 @@ class _HomeSectionsFilterPageState extends State<HomeSectionsFilterPage> {
       _Group('Continue Watching', [
         cw('cw:movies', 'Movies', TrackingSource.local),
         cw('cw:series', 'Series', TrackingSource.local),
+      ]),
+      // Its own group: an opt-in row inside Continue Watching would change
+      // what that group's all-on/all-off toggle does.
+      _Group('Upcoming', [
+        opt(HomeExtraRowIds.airingSoon, 'Airing soon', badge: 'CALENDAR'),
       ]),
       _Group('Trakt', [
         cw('trakt:movies', 'Movies', TrackingSource.trakt, badge: 'CW'),
@@ -388,16 +389,7 @@ class _HomeSectionsFilterPageState extends State<HomeSectionsFilterPage> {
       if (c.pinToTop) add(HomeCollectionRowIds.collection(c.id));
     }
     for (final id in const [
-      'cw:movies',
-      'cw:series',
-      'trakt:movies',
-      'trakt:shows',
-      'simkl:movies',
-      'simkl:shows',
-      'mdblist:movies',
-      'mdblist:shows',
-      'iptv:movies',
-      'iptv:series',
+      ...HomeRowOrder.continueWatchingIds,
       'watchlist:movies',
       'watchlist:series',
       'fav:playlist',
