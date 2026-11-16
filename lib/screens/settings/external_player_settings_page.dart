@@ -6,6 +6,7 @@ import '../../utils/file_pick.dart';
 import '../../services/external_player_service.dart';
 import '../../services/storage_service.dart';
 import '../../services/player_controls_display_settings.dart';
+import '../../services/player_gesture_settings.dart';
 import '../../services/android_native_downloader.dart';
 import '../../services/subtitle_font_service.dart';
 import '../../services/skip_segment_service.dart';
@@ -119,6 +120,7 @@ class _ExternalPlayerSettingsPageState
   bool _startPortrait = false; // Phone only, opt-in
   bool _subtitleOnlyForeignAudio = false;
   bool _subtitleForcedOnly = false;
+  bool _swipeSeek = true; // Phone only, on by default
   bool _subtitleAutoSync = false; // Native players only, experimental opt-in
   int _movieCompletionThreshold =
       StorageService.defaultLocalCompletionThreshold;
@@ -495,6 +497,7 @@ class _ExternalPlayerSettingsPageState
 
     try {
       await PlayerControlsDisplaySettings.load();
+      _swipeSeek = await PlayerGestureSettings.load();
       // Load default player mode
       final mode = await StorageService.getDefaultPlayerMode();
 
@@ -2189,6 +2192,13 @@ class _ExternalPlayerSettingsPageState
     );
   }
 
+  /// Also refreshes [PlayerGestureSettings]'s synchronous cache so an open
+  /// or next player picks the choice up without another settings load.
+  Future<void> _setSwipeSeek(bool enabled) async {
+    setState(() => _swipeSeek = enabled);
+    await PlayerGestureSettings.setSwipeSeek(enabled);
+  }
+
   Widget _defaultsCard(String title, String subtitle, List<Widget> children) {
     final theme = Theme.of(context);
     final t = AppThemeScope.of(context).settings;
@@ -2364,6 +2374,15 @@ class _ExternalPlayerSettingsPageState
                   onChanged: _setStartPortrait,
                   focusNode: _startPortraitFocusNode,
                   isFocused: _startPortraitFocused,
+                ),
+                const SizedBox(height: 4),
+                // Swipe-to-seek (phones only, like the portrait row).
+                _buildCheckboxTile(
+                  context,
+                  title: 'Swipe left or right to seek',
+                  subtitle: 'Turn off if swiping gets in the way of going back',
+                  value: _swipeSeek,
+                  onChanged: _setSwipeSeek,
                 ),
               ],
             ],

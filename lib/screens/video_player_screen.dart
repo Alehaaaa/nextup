@@ -21,6 +21,7 @@ import 'package:window_manager/window_manager.dart';
 import 'package:flutter/services.dart';
 import '../services/player_display_controls.dart';
 import '../services/player_controls_display_settings.dart';
+import '../services/player_gesture_settings.dart';
 import '../services/system_volume.dart';
 import 'package:synchronized/synchronized.dart';
 
@@ -1728,6 +1729,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
     ProfileRuntime.scope.addListener(_onPlayerMetadataPolicyChanged);
     unawaited(GlassTokens.load());
     unawaited(PlayerControlsDisplaySettings.load());
+    unawaited(PlayerGestureSettings.load());
     _controlsVisible.addListener(_syncGlassProbe);
     _continuousShuffleEnabled = widget.initialContinuousShuffle;
     _activeHttpHeaders = widget.httpHeaders;
@@ -14504,6 +14506,17 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
         }
       }
     }
+    // System back-gesture zones: pans that begin within 24 px of either
+    // side edge never drive the HUD.
+    final edgeBox = context.findRenderObject() as RenderBox?;
+    if (edgeBox != null) {
+      const edgeGuard = 24.0;
+      final edgeDx = details.localPosition.dx;
+      if (edgeDx < edgeGuard || edgeDx > edgeBox.size.width - edgeGuard) {
+        _panIgnore = true;
+        return;
+      }
+    }
     _gestureStartPosition = details.localPosition;
     _gestureStartVideoPosition = _position;
     _gestureStartVolume = (_player.state.volume / 100.0).clamp(0.0, 1.0);
@@ -14529,6 +14542,11 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
     // Decide mode on first significant movement
     if (_mode == GestureMode.none) {
       if (absDx > 12 && absDx > absDy) {
+        if (!PlayerGestureSettings.swipeSeekCached) {
+          // Swipe-to-seek is off: ignore the whole drag, no seek HUD, no seek.
+          _panIgnore = true;
+          return;
+        }
         _mode = GestureMode.seek;
       } else if (absDy > 12) {
         final isLeftHalf = _gestureStartPosition.dx < size.width / 2;
