@@ -9415,6 +9415,11 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
         source: source,
         beforeOpen: () {
           armed = true;
+          // The budget is for the source, so it starts when the file opens.
+          // Setup before this point (a media server's watch-state requests,
+          // authorization) could take most of it on a slow or remote server,
+          // and the player then refused episodes it would have played.
+          stopwatch.reset();
           return true;
         },
       );
