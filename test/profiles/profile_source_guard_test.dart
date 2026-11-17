@@ -66,6 +66,8 @@ void main() {
       'lib/services/profiles/profile_bootstrap.dart',
       'lib/services/profiles/profile_migration_service.dart',
       'lib/services/profiles/profile_database_snapshot.dart',
+      // Read-only: names the database files to size them, never opens them.
+      'lib/features/storage_usage/data/storage_scanner.dart',
     };
     final violations = <String>[];
     for (final entity in Directory('lib').listSync(recursive: true)) {

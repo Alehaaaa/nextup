@@ -6308,7 +6308,11 @@ class IptvResultsViewState extends State<IptvResultsView>
         : null;
     final canSave = channel.contentType != 'series';
     final isFavorited = _favoriteUrls.contains(channel.url);
-    final multiView = MultiViewLauncher.eligible(channel);
+    // Needs the app's provider scope; without one (an embedded or test
+    // host) the actions open without the multi-view entries.
+    final multiView =
+        MultiViewLauncher.eligible(channel) &&
+        MultiViewLauncher.available(context);
     final inMultiView =
         multiView && MultiViewLauncher.contains(context, channel);
     final multiViewCount = multiView ? MultiViewLauncher.count(context) : 0;

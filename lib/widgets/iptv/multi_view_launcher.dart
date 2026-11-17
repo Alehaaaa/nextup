@@ -32,6 +32,17 @@ abstract final class MultiViewLauncher {
   /// Live channels only: movies and series are not multi-view material.
   static bool eligible(IptvChannel channel) => supported && channel.isLive;
 
+  /// Whether [context] sits under the app's provider scope, which holds the
+  /// selection.
+  static bool available(BuildContext context) {
+    try {
+      ProviderScope.containerOf(context, listen: false);
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
   static MultiViewSelectionNotifier _notifier(BuildContext context) =>
       ProviderScope.containerOf(
         context,
