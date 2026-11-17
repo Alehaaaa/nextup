@@ -7123,9 +7123,8 @@ class AndroidTvTorrentPlayerActivity : AppCompatActivity() {
                         }
                     }
                     KeyEvent.KEYCODE_DPAD_UP -> {
-                        // Long-press up in channel list: jump to search bar
-                        if (isFocusInIptvChannelList() && event.repeatCount >= SEEK_LONG_PRESS_THRESHOLD) {
-                            iptvGuideSearch?.requestFocus()
+                        // A held UP scrolls the list and stops on channel 1.
+                        if (TvGuideHeldUp.holdsInList(iptvGuideList, event)) {
                             return true
                         }
                     }
@@ -7149,8 +7148,10 @@ class AndroidTvTorrentPlayerActivity : AppCompatActivity() {
                         }
                     }
                     KeyEvent.KEYCODE_DPAD_UP -> {
-                        if (isFocusInStremioTvGuideList() && event.repeatCount >= SEEK_LONG_PRESS_THRESHOLD) {
-                            stremioTvGuideSearch?.requestFocus()
+                        // A held UP scrolls the list and stops on its first row;
+                        // the repeats of the press that opened the guide do nothing.
+                        if ((event.repeatCount > 0 && event.downTime == stremioTvGuideOpeningUpDownTime) ||
+                            TvGuideHeldUp.holdsInList(stremioTvGuideList, event)) {
                             return true
                         }
                     }
@@ -7324,7 +7325,7 @@ class AndroidTvTorrentPlayerActivity : AppCompatActivity() {
             // Stremio TV mode: UP opens the channel guide
             if (isStremioTvMode && stremioTvChannels.isNotEmpty()) {
                 if (event.action == KeyEvent.ACTION_DOWN && event.repeatCount == 0) {
-                    showStremioTvGuide()
+                    showStremioTvGuideFromUp(event)
                 }
                 return true
             }
@@ -19550,7 +19551,17 @@ class AndroidTvTorrentPlayerActivity : AppCompatActivity() {
         }
     }
 
+    /** downTime of the UP press that opened the Stremio TV guide; null when none did. */
+    private var stremioTvGuideOpeningUpDownTime: Long? = null
+
+    /** Opened by an UP press: the rest of that hold must not scroll the list. */
+    private fun showStremioTvGuideFromUp(openingUp: KeyEvent) {
+        showStremioTvGuide()
+        stremioTvGuideOpeningUpDownTime = openingUp.downTime
+    }
+
     private fun showStremioTvGuide() {
+        stremioTvGuideOpeningUpDownTime = null
         stremioTvGuideVisible = true
         stremioTvGuideOverlay?.animate()?.cancel()
         stremioTvGuideOverlay?.visibility = View.VISIBLE
@@ -19577,6 +19588,7 @@ class AndroidTvTorrentPlayerActivity : AppCompatActivity() {
 
     private fun hideStremioTvGuide() {
         stremioTvGuideVisible = false
+        stremioTvGuideOpeningUpDownTime = null
         cancelGuideWait()
         stremioTvGuideOverlay?.animate()?.cancel()
         stremioTvGuideOverlay?.animate()?.alpha(0f)?.setDuration(150)?.withEndAction {
