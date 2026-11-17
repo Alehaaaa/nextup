@@ -2751,7 +2751,25 @@ sheetAnimationStyle: kMenuSheetAnimation,
           );
         }
 
+        final overview = episode.overview?.trim() ?? '';
         final tiles = <Widget>[
+          // The whole description: episode cards clamp it to a few lines and
+          // offer no other way to read the rest. It scrolls with the rows, so
+          // a long one can never squeeze them off the sheet.
+          if (overview.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
+              child: Text(
+                overview,
+                style: TextStyle(
+                  color: Theme.of(
+                    sheetCtx,
+                  ).colorScheme.onSurface.withValues(alpha: 0.72),
+                  fontSize: 13.5,
+                  height: 1.45,
+                ),
+              ),
+            ),
           // Autofocus Play on TV so the sheet opens with a live target.
           tile(
             Icons.play_arrow_rounded,

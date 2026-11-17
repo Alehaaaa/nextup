@@ -1,3 +1,4 @@
+import '../utils/synopsis_text.dart';
 import '../widgets/downloaded_media_button.dart';
 import '../services/downloaded_media_service.dart';
 import '../services/metadata_provider_service.dart';
@@ -1800,7 +1801,9 @@ class _CatalogItemDetailScreenState extends State<CatalogItemDetailScreen>
 
   Widget? _secDescription(double start) {
     var description = _item.description ?? '';
-    if (description.isEmpty || description.length < 40) {
+    if (description.isEmpty ||
+        description.length < 40 ||
+        synopsisLooksCut(description)) {
       description = _imdbExtra?.plot ?? description;
     }
     if (description.isEmpty) return null;
