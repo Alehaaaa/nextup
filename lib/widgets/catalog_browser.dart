@@ -1749,7 +1749,9 @@ class CatalogBrowserState extends State<CatalogBrowser> {
       isTelevision: widget.isTelevision,
       showQuickPlay: widget.showQuickPlay,
       onItemSelected: widget.onItemSelected,
-      onQuickPlay: widget.onQuickPlay,
+      onQuickPlay: widget.onQuickPlay == null
+          ? null
+          : (selection) async => widget.onQuickPlay!(selection),
       // Restore the host's pre-drill-down source only when the user backs
       // out without picking anything; terminal selections route through
       // onItemSelected/onQuickPlay and the host owns that teardown.

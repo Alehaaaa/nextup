@@ -72,7 +72,6 @@ import '../services/mdblist/mdblist_menu_helpers.dart';
 import '../widgets/tracker_brand_marks.dart';
 import '../widgets/card_action_menu.dart' show CardOptionsHandler;
 import '../widgets/hold_feedback.dart';
-import 'episodes_screen.dart' show kCatalogDetailRouteName;
 import 'settings/detail_page_style_page.dart' show effectiveDetailPageStyle;
 import '../theme/app_theme_controller.dart';
 import '../theme/theme_core_resolver.dart';
@@ -3784,18 +3783,11 @@ class _MergedDetailScreenState extends State<MergedDetailScreen>
       showQuickPlay: true,
       isTraktSource: widget.isTraktSource,
       isMdblistSource: widget.isMdblistSource,
-      // Sources / fallback-search render in-tab on the Search host, so tear
-      // down every merged/detail route first — popUntil the route name because
-      // a single pop would leave a *parent* merged screen (series A →
-      // recommended series B → pick episode) underneath instead of returning
-      // to Search (every merged/detail route shares kCatalogDetailRouteName).
-      // Mirrors the standalone EpisodesScreen._popToHost.
-      onItemSelected: widget.onItemSelected == null
-          ? null
-          : (selection) {
-              _popToHost();
-              widget.onItemSelected!(selection);
-            },
+      // The host pushes Sources on top of this page, like the hero's own
+      // "browse sources", so Back from Sources returns to this season's
+      // episodes; didPopNext then refreshes the ticks. Closing the page first
+      // sent Back all the way to Home.
+      onItemSelected: widget.onItemSelected,
       // Quick-play deliberately does NOT pop: the host pushes the player on
       // top of this screen (same as the hero Resume), so playback pops back to
       // the episode list here — didPopNext then refreshes the ticks.
@@ -3826,14 +3818,6 @@ class _MergedDetailScreenState extends State<MergedDetailScreen>
         }
       },
     );
-  }
-
-  /// Tear every merged/detail route (any drill-down depth) back down to the
-  /// Search host, so a selection it renders in-tab isn't hidden behind them.
-  void _popToHost() {
-    Navigator.of(
-      context,
-    ).popUntil((r) => r.settings.name != kCatalogDetailRouteName);
   }
 
   /// Stacked layout — mobile only. Compact hero (with Play/Bind/More) → a
