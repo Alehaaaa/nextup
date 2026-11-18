@@ -7,6 +7,8 @@ import 'package:path/path.dart' as p;
 import '../models/downloaded_media.dart';
 import '../utils/app_storage.dart';
 import '../utils/movie_parser.dart';
+import '../models/playlist_view_mode.dart';
+import '../screens/video_player/models/playlist_entry.dart';
 import 'download_service.dart';
 import 'profiles/profile_runtime.dart';
 import 'local_playback_resume_resolver.dart';
@@ -553,7 +555,15 @@ class DownloadedMediaService {
     }
   }
 
-  static Future<void> play(BuildContext context, LocalDownload item) async {
+  /// Plays [item]. A downloaded episode is opened together with the show's
+  /// other downloaded episodes, so the player's Next (and the end-of-episode
+  /// advance) moves to the next file on the device instead of looking for a
+  /// stream. [library] is the downloads list when the caller already has it.
+  static Future<void> play(
+    BuildContext context,
+    LocalDownload item, {
+    List<LocalDownload>? library,
+  }) async {
     if (!item.isReady) return;
     if (!item.location.startsWith('content://') &&
         !await File(item.location).exists()) {
@@ -568,13 +578,46 @@ class DownloadedMediaService {
     }
     if (!context.mounted) return;
     final media = item.media;
+    var episodes = const <LocalDownload>[];
+    if (media?.type == 'series' &&
+        media!.season != null &&
+        media.episode != null) {
+      List<LocalDownload> all;
+      try {
+        all = library ?? await load();
+      } catch (_) {
+        all = const [];
+      }
+      episodes = downloadedEpisodeQueue(item, all);
+      if (!context.mounted) return;
+    }
+    final playlist = episodes.length > 1
+        ? [
+            for (final episode in episodes)
+              PlaylistEntry(
+                url: _playableUrl(episode.location),
+                // Season and episode in a form the player parses, so it
+                // treats the files as one series and walks them in order.
+                title: _episodeTitle(episode),
+                sizeBytes: episode.record.expectedFileSize > 0
+                    ? episode.record.expectedFileSize
+                    : null,
+              ),
+          ]
+        : null;
+    final startIndex = playlist == null
+        ? null
+        : episodes.indexWhere((e) => e.location == item.location);
     await VideoPlayerLauncher.push(
       context,
       VideoPlayerLaunchArgs(
-        videoUrl: item.location.startsWith('content://')
-            ? item.location
-            : Uri.file(item.location).toString(),
-        title: item.record.task.filename,
+        videoUrl: _playableUrl(item.location),
+        title: playlist == null
+            ? item.record.task.filename
+            : playlist[startIndex!].title,
+        playlist: playlist,
+        startIndex: startIndex,
+        viewMode: playlist == null ? null : PlaylistViewMode.sorted,
         contentTitle: item.title,
         contentImdbId: media?.isCatalogLinked == true ? media!.id : null,
         contentType: media?.type,
@@ -587,6 +630,17 @@ class DownloadedMediaService {
             : PlaybackResumePolicy.catalogCanonical,
       ),
     );
+  }
+
+  static String _playableUrl(String location) =>
+      location.startsWith('content://')
+      ? location
+      : Uri.file(location).toString();
+
+  static String _episodeTitle(LocalDownload item) {
+    final media = item.media!;
+    String two(int n) => n.toString().padLeft(2, '0');
+    return '${media.title} - S${two(media.season!)}E${two(media.episode!)}';
   }
 
   static Future<bool> playMatching(
@@ -773,4 +827,37 @@ class _MediaCache {
       _dirty = false;
     } catch (_) {}
   }
+}
+
+/// The downloaded episodes of [item]'s show, in season and episode order,
+/// one file per episode ([item]'s own for its episode), for the player to
+/// step through. Only finished files with a known season and episode.
+@visibleForTesting
+List<LocalDownload> downloadedEpisodeQueue(
+  LocalDownload item,
+  List<LocalDownload> library,
+) {
+  final media = item.media;
+  if (media == null || media.season == null || media.episode == null) {
+    return [item];
+  }
+  final byEpisode = <(int, int), LocalDownload>{};
+  for (final other in library) {
+    final m = other.media;
+    if (!other.isReady ||
+        m == null ||
+        m.type != 'series' ||
+        m.key != media.key ||
+        m.season == null ||
+        m.episode == null) {
+      continue;
+    }
+    byEpisode.putIfAbsent((m.season!, m.episode!), () => other);
+  }
+  byEpisode[(media.season!, media.episode!)] = item;
+  final keys = byEpisode.keys.toList()
+    ..sort(
+      (a, b) => a.$1 != b.$1 ? a.$1.compareTo(b.$1) : a.$2.compareTo(b.$2),
+    );
+  return [for (final key in keys) byEpisode[key]!];
 }

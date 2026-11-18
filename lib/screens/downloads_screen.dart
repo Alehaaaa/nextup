@@ -72,6 +72,11 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
   /// same thin white bar Home's tiles carry. Read from this device only.
   Map<String, double> _watched = const {};
   int _watchedGeneration = 0;
+
+  /// Show posters found beyond the first file's own, by group key: another
+  /// episode's, the title's saved offline details, or IMDb's poster.
+  Map<String, String> _posters = const {};
+  int _postersGeneration = 0;
   String _watchedSignature = '';
   StreamSubscription? _status, _moves, _progressSub;
   Timer? _folderPoll;
@@ -174,6 +179,7 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
         if (signature != _watchedSignature) {
           _watchedSignature = signature;
           unawaited(_loadWatched());
+          unawaited(_loadPosters());
         }
       }
     } catch (_) {
@@ -184,6 +190,25 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
         });
       }
     }
+  }
+
+  /// A downloaded episode often carries no poster (or only the first file is
+  /// read), so the show's tile fell back to a blank card with its name. Use
+  /// any file's poster, then the title's saved details, then IMDb's poster.
+  Future<void> _loadPosters() async {
+    final generation = ++_postersGeneration;
+    final groups = <String, List<LocalDownload>>{};
+    for (final item in _items) {
+      if (item.media == null) continue;
+      groups.putIfAbsent(item.groupKey, () => []).add(item);
+    }
+    final next = <String, String>{};
+    for (final entry in groups.entries) {
+      final poster = await downloadedTitlePoster(entry.value);
+      if (poster != null) next[entry.key] = poster;
+    }
+    if (!mounted || generation != _postersGeneration) return;
+    setState(() => _posters = next);
   }
 
   Future<void> _loadWatched() async {
@@ -406,7 +431,11 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
     switch (action) {
       case _DownloadCardAction.play:
         try {
-          await DownloadedMediaService.play(context, ready.first);
+          await DownloadedMediaService.play(
+            context,
+            ready.first,
+            library: ready,
+          );
         } catch (_) {
           _snack('Could not open this download.');
         }
@@ -590,7 +619,7 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
           id: entry.key,
           type: entry.value.first.media?.type ?? 'movie',
           name: entry.value.first.title,
-          poster: entry.value.first.media?.poster,
+          poster: _posters[entry.key] ?? _firstPoster(entry.value),
           year: entry.value.first.media?.year,
         ),
     ];
@@ -649,7 +678,9 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
                     icon: Icons.refresh_rounded,
                     onTap: _refresh,
                   ),
-                  if (ProfilePolicyGuard.allowsSync(ProfileFeature.cloudFiles)) ...[
+                  if (ProfilePolicyGuard.allowsSync(
+                    ProfileFeature.cloudFiles,
+                  )) ...[
                     const SizedBox(width: 10),
                     _GlassIconButton(
                       tooltip: 'Browse cloud files',
@@ -877,7 +908,7 @@ Future<void> openDownloadedItem(
           )
           .firstOrNull;
       if (local != null) {
-        await DownloadedMediaService.play(ctx, local);
+        await DownloadedMediaService.play(ctx, local, library: ready);
         return;
       }
       ScaffoldMessenger.of(ctx).showSnackBar(
@@ -898,7 +929,7 @@ Future<void> openDownloadedItem(
       );
       return;
     }
-    await DownloadedMediaService.play(ctx, ready.first);
+    await DownloadedMediaService.play(ctx, ready.first, library: ready);
   }
 
   await Navigator.of(context).push(
@@ -1057,9 +1088,9 @@ Future<bool> _confirmDeleteEpisodeDownload(
     return false;
   }
   if (context.mounted) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Deleted $label')),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text('Deleted $label')));
   }
   return true;
 }
@@ -1530,7 +1561,7 @@ class _DownloadedTitleScreenState extends State<DownloadedTitleScreen> {
     if (_playing) return;
     setState(() => _playing = true);
     try {
-      await DownloadedMediaService.play(context, item);
+      await DownloadedMediaService.play(context, item, library: _items);
     } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -2498,4 +2529,45 @@ class _FixMatchDialogState extends State<_FixMatchDialog> {
       ),
     );
   }
+}
+
+String? _firstPoster(List<LocalDownload> items) {
+  for (final item in items) {
+    final poster = item.media?.poster;
+    if (poster != null && poster.isNotEmpty) return poster;
+  }
+  return null;
+}
+
+/// The poster for a downloaded title: any of its files' own poster, else the
+/// one in its saved offline details, else IMDb's for a catalog-linked title.
+@visibleForTesting
+Future<String?> downloadedTitlePoster(
+  List<LocalDownload> items, {
+  OfflineTitleStore? store,
+}) async {
+  final own = _firstPoster(items);
+  if (own != null) return own;
+  final media = items.first.media;
+  if (media == null || !media.isCatalogLinked) return null;
+  try {
+    final offline = store ?? OfflineTitleStore.instance;
+    final page = PageSnapshot.fromJson(
+      await offline.read(media.id, OfflineTitleStore.page),
+    )?.meta?.poster;
+    if (page != null && page.isNotEmpty) return page;
+    final saved = await offline.read(
+      media.id,
+      '${OfflineTitleStore.meta}:${media.type}',
+    );
+    if (saved is Map) {
+      final poster = saved['poster'];
+      if (poster is String && poster.isNotEmpty) return poster;
+    }
+  } catch (_) {
+    // No saved details: fall through to IMDb's poster.
+  }
+  return media.id.startsWith('tt')
+      ? 'https://images.metahub.space/poster/medium/${media.id}/img'
+      : null;
 }
