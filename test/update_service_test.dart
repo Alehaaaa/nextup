@@ -92,11 +92,18 @@ void main() {
       );
     });
 
-    test('keeps the normal channel on the latest-release endpoint', () async {
+    test('the normal channel skips versioned prereleases', () async {
+      // The list endpoint, since per-commit builds are prereleases that
+      // /releases/latest never returns.
       final client = MockClient((request) async {
-        expect(request.url.path, endsWith('/releases/latest'));
-        expect(request.url.query, isEmpty);
-        return http.Response(jsonEncode(_release('v0.9.4-beta.1')), 200);
+        expect(request.url.path, endsWith('/releases'));
+        return http.Response(
+          jsonEncode(<Object?>[
+            _release('v0.9.4-beta.1'),
+            _release('v0.9.5-alpha.1', prerelease: true),
+          ]),
+          200,
+        );
       });
 
       final release = await UpdateService.fetchLatestRelease(

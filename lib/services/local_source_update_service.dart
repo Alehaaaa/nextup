@@ -1,9 +1,19 @@
 import 'dart:io';
 
-/// Updates this personal macOS build from its local fork instead of downloading
-/// a prebuilt release. The source checkout keeps the episode-link patch while
-/// merging new commits from upstream.
+import 'update_service.dart' show kNextupBuildNumber;
+
+/// Updates a macOS build compiled on this Mac from its local checkout instead
+/// of downloading a prebuilt release. The checkout follows the fork's `main`
+/// on GitHub; CI builds (which carry a build number) update from releases.
 class LocalSourceUpdateService {
+  /// Whether this build updates from the local checkout: a macOS build made
+  /// locally (no CI build number) next to its source checkout and Flutter SDK.
+  static bool get applies =>
+      Platform.isMacOS &&
+      kNextupBuildNumber == 0 &&
+      sourceDirectory.existsSync() &&
+      File(flutter).existsSync();
+
   static final Directory sourceDirectory = Directory(
     '${Platform.environment['HOME']}/Documents/Programming/GitHub/debrify-nextup',
   );
@@ -18,23 +28,24 @@ class LocalSourceUpdateService {
       '-C',
       sourceDirectory.path,
       'fetch',
-      'upstream',
-      '+main:refs/remotes/upstream/main',
+      'origin',
+      '+main:refs/remotes/origin/main',
     ]);
     final base = await _output('/usr/bin/git', [
       '-C',
       sourceDirectory.path,
       'merge-base',
       'HEAD',
-      'upstream/main',
+      'origin/main',
     ]);
-    final upstream = await _output('/usr/bin/git', [
+    final remote = await _output('/usr/bin/git', [
       '-C',
       sourceDirectory.path,
       'rev-parse',
-      'upstream/main',
+      'origin/main',
     ]);
-    return base != upstream;
+    // Behind the fork's main: its newest commit is not in this checkout yet.
+    return base != remote;
   }
 
   /// Starts an independent helper that merges, builds, signs, replaces this
@@ -51,14 +62,12 @@ class LocalSourceUpdateService {
     await script.writeAsString('''#!/bin/zsh
 set -eu
 cd $quotedSource
-/usr/bin/git fetch upstream +main:refs/remotes/upstream/main
-if ! /usr/bin/git merge --no-edit --autostash upstream/main; then
-  /usr/bin/git merge --abort || true
-  /usr/bin/osascript -e 'display notification "Upstream conflicts with your fork. Merge it by hand." with title "Nextup update"' || true
+/usr/bin/git fetch origin +main:refs/remotes/origin/main
+if ! /usr/bin/git merge --ff-only --autostash origin/main; then
+  /usr/bin/osascript -e 'display notification "Your checkout has local commits that are not on main. Update it by hand." with title "Nextup update"' || true
   /bin/rm -f "\$0"
   exit 1
 fi
-/usr/bin/git push origin HEAD:nextup || true
 PATH=$quotedPods:\$PATH $quotedFlutter build macos --release --build-name 0.10.0-nextup --build-number 1 --dart-define=DEBRIFY_LOCAL_VALIDATION=false || exit 1
 app=build/macos/Build/Products/Release/Nextup.app
 /usr/bin/xattr -cr "\$app"

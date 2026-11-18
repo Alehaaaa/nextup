@@ -6,9 +6,21 @@ import 'package:http/http.dart' as http;
 import '../utils/platform_util.dart';
 
 const String _kGithubOwner = 'Alehaaaa';
-const String _kGithubRepo = 'debrify';
+const String _kGithubRepo = 'nextup';
 const String _kReleasesPage =
     'https://github.com/$_kGithubOwner/$_kGithubRepo/releases';
+
+/// The CI build this app came from, stamped in at build time with
+/// `--dart-define=NEXTUP_BUILD_NUMBER=<run number>`. Every commit to `main` is
+/// published as a `build-<number>-<sha>` release, so the number orders them.
+/// Zero for local and development builds, which never report an update.
+const int kNextupBuildNumber = int.fromEnvironment('NEXTUP_BUILD_NUMBER');
+
+/// The commit this app was built from (`NEXTUP_COMMIT`); empty when unknown.
+const String kNextupCommit = String.fromEnvironment('NEXTUP_COMMIT');
+
+/// A per-commit release tag such as `build-80-6ff4ebc`.
+final RegExp _kBuildTag = RegExp(r'^build-(\d+)-([0-9a-f]{7,40})$');
 
 /// Provides helpers to inspect GitHub releases and determine whether a newer
 /// build is available for the current client.
@@ -35,11 +47,6 @@ class UpdateService {
   static final Map<bool, AppRelease> _cachedReleases = {};
   static final Map<bool, DateTime> _lastFetches = {};
 
-  static Uri get _latestReleaseUri => Uri.https(
-    'api.github.com',
-    '/repos/$_kGithubOwner/$_kGithubRepo/releases/latest',
-  );
-
   static Uri get _releasesUri => Uri.https(
     'api.github.com',
     '/repos/$_kGithubOwner/$_kGithubRepo/releases',
@@ -63,8 +70,10 @@ class UpdateService {
       return cachedRelease;
     }
 
+    // The list, not /releases/latest: per-commit builds are published as
+    // prereleases, which /releases/latest never returns.
     final response = await (client?.get ?? http.get)(
-      includePrereleases ? _releasesUri : _latestReleaseUri,
+      _releasesUri,
       headers: const {
         'Accept': 'application/vnd.github+json',
         'User-Agent': 'debrify-app',
@@ -76,28 +85,42 @@ class UpdateService {
     }
 
     final decoded = jsonDecode(response.body);
-    final AppRelease release;
-    if (includePrereleases) {
-      if (decoded is! List) {
-        throw const UpdateException('GitHub returned an invalid release list');
-      }
-      final releases = decoded.whereType<Map<String, dynamic>>().map(
-        AppRelease.fromJson,
-      );
-      final selected = latestEligibleRelease(releases);
-      if (selected == null) {
-        throw const UpdateException('No published releases were found');
-      }
-      release = selected;
-    } else {
-      if (decoded is! Map<String, dynamic>) {
-        throw const UpdateException('GitHub returned an invalid release');
-      }
-      release = AppRelease.fromJson(decoded);
+    if (decoded is! List) {
+      throw const UpdateException('GitHub returned an invalid release list');
+    }
+    final releases = decoded
+        .whereType<Map<String, dynamic>>()
+        .map(AppRelease.fromJson)
+        .toList();
+    final release =
+        latestBuildRelease(releases) ??
+        latestEligibleRelease(
+          includePrereleases
+              ? releases
+              : releases.where((r) => !r.prerelease),
+        );
+    if (release == null) {
+      throw const UpdateException('No published releases were found');
     }
     _cachedReleases[includePrereleases] = release;
     _lastFetches[includePrereleases] = now;
     return release;
+  }
+
+  /// The newest per-commit build (`build-<number>-<sha>`) in a release list,
+  /// by build number; null when there is none. These are this fork's update
+  /// channel, so they count whatever the prerelease setting says.
+  static AppRelease? latestBuildRelease(Iterable<AppRelease> releases) {
+    AppRelease? selected;
+    for (final release in releases) {
+      if (release.draft) continue;
+      final number = release.buildNumber;
+      if (number == null) continue;
+      if (selected == null || number > selected.buildNumber!) {
+        selected = release;
+      }
+    }
+    return selected;
   }
 
   /// Picks the highest-versioned published release from a GitHub release list.
@@ -133,7 +156,15 @@ class UpdateService {
     final releaseVersion = AppVersion.tryParse(release.versionLabel);
     final clientVersion = AppVersion.tryParse(currentVersion);
     final bool updateAvailable;
-    if (releaseVersion == null || clientVersion == null) {
+    final releaseBuild = release.buildNumber;
+    if (releaseBuild != null) {
+      // Per-commit builds compare by build number. A local or development
+      // build carries none and is never offered one.
+      updateAvailable = isBuildNewer(
+        releaseBuild: releaseBuild,
+        currentBuild: kNextupBuildNumber,
+      );
+    } else if (releaseVersion == null || clientVersion == null) {
       updateAvailable = false;
     } else {
       updateAvailable = _isReleaseNewer(releaseVersion, clientVersion);
@@ -148,6 +179,13 @@ class UpdateService {
       checkedAt: DateTime.now(),
     );
   }
+
+  /// Whether build [releaseBuild] is newer than the running [currentBuild];
+  /// never when the running build's number is unknown (zero).
+  static bool isBuildNewer({
+    required int releaseBuild,
+    required int currentBuild,
+  }) => currentBuild > 0 && releaseBuild > currentBuild;
 
   /// Compares version labels using the same rules as a live update check.
   /// Exposed so platform-version edge cases can be covered without network
@@ -241,6 +279,18 @@ class AppRelease {
       assets: assets,
     );
   }
+
+  /// The build number of a per-commit release (`build-80-6ff4ebc` → 80);
+  /// null for any other tag.
+  int? get buildNumber {
+    final match = _kBuildTag.firstMatch(tagName);
+    return match == null ? null : int.tryParse(match.group(1)!);
+  }
+
+  /// What to call this release in the app: the release title for a
+  /// per-commit build ("Nextup build #80 (6ff4ebc)"), else its version tag.
+  String get displayLabel =>
+      buildNumber != null && name.isNotEmpty ? name : versionLabel;
 
   AppReleaseAsset? get androidApkAsset {
     for (final asset in assets) {

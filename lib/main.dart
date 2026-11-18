@@ -1,4 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'services/desktop_update_installer.dart';
+import 'widgets/desktop_update_progress.dart';
 import 'services/addon_auto_update_scheduler.dart';
 import 'widgets/iptv/multi_view_launcher.dart';
 import 'services/torrent_playback_service.dart';
@@ -2382,10 +2384,10 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
       if (!_allowsProfileFeature(ProfileFeature.appUpdates)) return true;
       final autoEnabled = await StorageService.getUpdateAutoCheckEnabled();
       if (!autoEnabled) return true;
-      // This macOS build updates from source: check the ORIGINAL repo
-      // (upstream) through the local checkout, same as Settings → Check for
-      // Updates, instead of the fork's GitHub releases.
-      if (!kIsWeb && Platform.isMacOS) {
+      // A macOS build compiled on this Mac has no CI build number to compare
+      // with the releases: it updates from its local checkout of the fork's
+      // main instead, same as Settings → Check for Updates.
+      if (!kIsWeb && LocalSourceUpdateService.applies) {
         return await _performLocalSourceUpdateCheck();
       }
       final includeAlpha = await StorageService.getUpdateIncludeAlphaEnabled();
@@ -2429,7 +2431,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
     }
   }
 
-  /// Startup check against the original repo via the local source checkout.
+  /// Startup check against the fork's main via the local source checkout.
   /// Silent when up to date or when the checkout/toolchain isn't available.
   Future<bool> _performLocalSourceUpdateCheck() async {
     final bool available;
@@ -2453,9 +2455,9 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
         builder: (dialogContext) => AlertDialog(
           title: const Text('Nextup update available'),
           content: const Text(
-            'The original Debrify repo has new changes. Nextup will merge them '
-            'into your local fork (keeping your changes), build it, replace this '
-            'app and relaunch when the build succeeds.',
+            'Your Nextup repo has new commits on main. Nextup will pull them '
+            'into your local checkout, build it, replace this app and relaunch '
+            'when the build succeeds.',
           ),
           actions: [
             TextButton(
@@ -2492,10 +2494,10 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
     final bool isAndroidDevice = !kIsWeb && Platform.isAndroid;
     final bool canInstallDirectly =
         summary.updateAvailable &&
-        isAndroidDevice &&
-        release.androidApkAsset != null;
-    final String latestLabel = release.versionLabel.isNotEmpty
-        ? release.versionLabel
+        ((isAndroidDevice && release.androidApkAsset != null) ||
+            DesktopUpdateInstaller.canInstall(release));
+    final String latestLabel = release.displayLabel.isNotEmpty
+        ? release.displayLabel
         : 'Latest release';
     final String? publishedLabel = release.publishedAt != null
         ? DateFormat.yMMMd().format(release.publishedAt!.toLocal())
@@ -2627,6 +2629,15 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
   }
 
   Future<void> _startAutoUpdateDownload(AppRelease release) async {
+    if (DesktopUpdateInstaller.canInstall(release)) {
+      // macOS, Windows and Linux: download, install and reopen on the new
+      // build.
+      final failure = await installDesktopUpdate(context, release);
+      if (failure == null || !mounted) return;
+      _showAutoUpdateSnack(failure);
+      await _openReleasesPage(release.htmlUrl);
+      return;
+    }
     if (kIsWeb || !Platform.isAndroid) {
       await _openReleasesPage(release.htmlUrl);
       return;

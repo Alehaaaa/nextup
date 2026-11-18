@@ -1,6 +1,8 @@
 import 'package:debrify/screens/settings/storage_usage_route.dart';
 import 'settings/tv_collection_list_style_page.dart';
 import 'settings/metadata_settings_page.dart';
+import '../services/desktop_update_installer.dart';
+import '../widgets/desktop_update_progress.dart';
 import '../widgets/collections/tmdb_attribution.dart';
 import 'dart:async';
 import 'dart:convert';
@@ -6776,10 +6778,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
     if (_currentVersionName.isEmpty) return;
     await StorageService.setIgnoredUpdateVersion(null);
 
-    if (!kIsWeb && Platform.isMacOS) {
+    if (!kIsWeb && LocalSourceUpdateService.applies) {
       setState(() {
         _checkingUpdates = true;
-        _updateSubtitle = 'Checking local fork for upstream changes...';
+        _updateSubtitle = 'Checking your repo for new commits...';
       });
       try {
         final available = await LocalSourceUpdateService.updateAvailable();
@@ -6787,8 +6789,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
         setState(() {
           _checkingUpdates = false;
           _updateSubtitle = available
-              ? 'Upstream update available — build locally'
-              : 'You are on the latest upstream build';
+              ? 'Update available — build locally'
+              : 'You are on the latest build';
         });
         if (available) {
           await showDialog<void>(
@@ -6796,7 +6798,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             builder: (context) => AlertDialog(
               title: const Text('Build local update?'),
               content: const Text(
-                'Nextup will merge the upstream update, build it locally, replace this app, and relaunch when the build succeeds.',
+                'Nextup will pull the new commits from your repo, build them locally, replace this app, and relaunch when the build succeeds.',
               ),
               actions: [
                 TextButton(
@@ -6844,7 +6846,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       if (!mounted) return;
       setState(() {
         _updateSubtitle = summary.updateAvailable
-            ? 'Update available (${summary.release.versionLabel})'
+            ? 'Update available (${summary.release.displayLabel})'
             : 'You are on the latest build';
         _checkingUpdates = false;
       });
@@ -6876,10 +6878,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final bool isAndroidDevice = !kIsWeb && Platform.isAndroid;
     final bool canInstallDirectly =
         summary.updateAvailable &&
-        isAndroidDevice &&
-        release.androidApkAsset != null;
-    final String latestLabel = release.versionLabel.isNotEmpty
-        ? release.versionLabel
+        ((isAndroidDevice && release.androidApkAsset != null) ||
+            DesktopUpdateInstaller.canInstall(release));
+    final String latestLabel = release.displayLabel.isNotEmpty
+        ? release.displayLabel
         : 'Latest release';
     final String notes = release.body.trim().isNotEmpty
         ? release.body.trim()
@@ -7017,7 +7019,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         FilledButton.icon(
                           onPressed: () {
                             Navigator.of(sheetContext).pop();
-                            _startAndroidUpdateDownload(release);
+                            if (DesktopUpdateInstaller.canInstall(release)) {
+                              unawaited(_installDesktopUpdate(release));
+                            } else {
+                              _startAndroidUpdateDownload(release);
+                            }
                           },
                           icon: const Icon(Icons.system_update_alt_rounded),
                           label: const Text('Download & Install'),
@@ -7423,6 +7429,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
     });
   }
 
+  /// macOS, Windows and Linux: download, install and reopen on the new build.
+  Future<void> _installDesktopUpdate(AppRelease release) async {
+    final failure = await installDesktopUpdate(context, release);
+    if (failure == null || !mounted) return;
+    _showSnack(failure);
+    await _openReleasesPage(release.htmlUrl);
+  }
+
   Future<void> _startAndroidUpdateDownload(AppRelease release) async {
     if (kIsWeb) {
       await _openReleasesPage(release.htmlUrl);
@@ -7447,7 +7461,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
     if (mounted) {
       setState(() {
-        _updateSubtitle = 'Downloading ${release.versionLabel}...';
+        _updateSubtitle = 'Downloading ${release.displayLabel}...';
       });
     }
 
