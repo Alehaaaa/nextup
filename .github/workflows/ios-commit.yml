@@ -232,7 +232,9 @@ jobs:
     needs: build
     if: github.ref_name == 'main' && needs.build.outputs.release_tag != ''
     # The pinned native dependency set predates Xcode 26 (see build.yml).
-    runs-on: macos-15
+    # Intel image: arm64 runners repeatedly got no capacity for this repo
+    # (see the build job). The app is still built universal.
+    runs-on: macos-15-intel
     env:
       RELEASE_TAG: ${{ needs.build.outputs.release_tag }}
     steps:
