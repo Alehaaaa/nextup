@@ -3,7 +3,7 @@
   "identifier": "io.github.alehaaaa.debrify.commits",
   "subtitle": "Nextup for iPhone and iPad, built from every commit.",
   "description": "Nextup is an independent, unofficial fork of Debrify with a Reels feed, Continue Watching synced across Trakt, Simkl and MDBList, offline-first downloads and a reworked glass interface.\n\nEvery commit to main in Alehaaaa/nextup is built automatically and published here with a changelog of what changed since the previous build, so updates show up right in SideStore or AltStore. The source keeps the last few builds, so you can always roll back.\n\nNot affiliated with or endorsed by the official Debrify project.",
-  "iconURL": "https://raw.githubusercontent.com/Alehaaaa/nextup/b48aae6eba4f822cc9eaa283f95cfca9be967817/assets/icon/app_icon_flat.png",
+  "iconURL": "https://raw.githubusercontent.com/Alehaaaa/nextup/389b280b2f46d53e1db8c18b67e39a7c48e1e399/assets/icon/app_icon_flat.png",
   "website": "https://github.com/Alehaaaa/nextup",
   "tintColor": "#7C4DFF",
   "featuredApps": [
@@ -16,11 +16,20 @@
       "developerName": "Alehaaaa",
       "subtitle": "Your movies and shows, one swipe away.",
       "localizedDescription": "Nextup brings your cloud accounts, WebDAV servers, Stremio catalogs, IPTV and YouTube into one library, with a player built for movies and TV.\n\n• Reels: swipe through official scenes and trailers, then jump straight into the title\n• Continue Watching that follows you across Trakt, Simkl and MDBList\n• Up Next links: open any episode straight from Up Next for Trakt\n• Downloads that work fully offline, with auto-download filters\n• A glass interface with your own looks and colour palettes\n• Lock-screen controls, touch lock, pinch to fill, double-tap to pause\n• WebDAV sync with snapshots, and backups that restore cleanly\n\nNextup doesn't host or provide any content; you connect the services you already use.\n\nThese are untested builds of every commit, made by GitHub Actions. SideStore or AltStore re-signs them with your own certificate on install. Nextup is an independent fork of Debrify and isn't affiliated with the official project.",
-      "iconURL": "https://raw.githubusercontent.com/Alehaaaa/nextup/b48aae6eba4f822cc9eaa283f95cfca9be967817/assets/icon/app_icon_flat.png",
+      "iconURL": "https://raw.githubusercontent.com/Alehaaaa/nextup/389b280b2f46d53e1db8c18b67e39a7c48e1e399/assets/icon/app_icon_flat.png",
       "tintColor": "#7C4DFF",
       "category": "entertainment",
       "screenshots": {},
       "versions": [
+        {
+          "version": "0.10.0.1",
+          "buildVersion": "202611181036",
+          "date": "2026-11-18T10:41:58Z",
+          "localizedDescription": "What's new:\n• CI: build the per-commit macOS app on the Intel runner (389b280b)\n\nBuild 202611181036 from main@389b280\nhttps://github.com/Alehaaaa/nextup/compare/b48aae6...389b280",
+          "downloadURL": "https://github.com/Alehaaaa/nextup/releases/download/build-82-389b280/nextup-ios-82-389b280.ipa",
+          "size": 40475225,
+          "minOSVersion": "14.0"
+        },
         {
           "version": "0.10.0.1",
           "buildVersion": "202611181006",
@@ -100,15 +109,6 @@
           "localizedDescription": "What's new:\n• Handle PikPak settings load failures (73fe451c)\n• style: align home collections and Reels glass controls (20cf0469)\n• fix: guard YouTube search races and async download lifecycles (3b51723a)\n\nBuild 202610111448 from nextup@73fe451\nhttps://github.com/Alehaaaa/debrify/compare/b385101...73fe451",
           "downloadURL": "https://github.com/Alehaaaa/debrify/releases/download/build-68-73fe451/nextup-ios-68-73fe451.ipa",
           "size": 40336642,
-          "minOSVersion": "14.0"
-        },
-        {
-          "version": "0.10.0.1",
-          "buildVersion": "202610111217",
-          "date": "2026-10-11T12:21:32Z",
-          "localizedDescription": "What's new:\n• style: unify cloud confirmations and Discover list glass (b385101a)\n• fix: retire stale scheduler startups and refresh home controls (e224a321)\n• style: unify frosted playlist, reels and settings popups (3258b170)\n• fix: isolate calendar requests and download observer callbacks (0d4af665)\n• Unify frosted nested controls across calendar and media routes (05e33d78)\n• Prevent duplicate download observers during startup retries (2bb96dda)\n• Extend frosted controls across libraries and nested routes (e01d7c6b)\n• Prioritize visible YouTube resolves and stabilize remote transfers (02d6f3aa)\n• Stabilize native Search tests and frosted nested actions (d58c6211)\n• Fix Spotlight desktop expansion and Windows TLS regression coverage (05dcb139)\n• Stabilize profile regressions and frosted playback surfaces (70140c32)\n• Stabilize IPTV lifecycle, Reel preloads and frosted nested UI (2a746d1d)\n\nBuild 202610111217 from nextup@b385101\nhttps://github.com/Alehaaaa/debrify/compare/5f6ef37...b385101",
-          "downloadURL": "https://github.com/Alehaaaa/debrify/releases/download/build-67-b385101/nextup-ios-67-b385101.ipa",
-          "size": 40327090,
           "minOSVersion": "14.0"
         }
       ],
