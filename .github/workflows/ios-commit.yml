@@ -285,6 +285,20 @@ jobs:
     - name: Build PGS-capable MediaKit frameworks
       run: dev/scripts/build_macos_media_kit_frameworks.sh packages/media_kit_libs_macos_video_patched/macos/Frameworks
 
+    # The libmpv frameworks above need the image's default Xcode 16 SDK, but
+    # plugins such as connectivity_plus use macOS 26 APIs, so the app itself
+    # builds with the newest Xcode 26 on the image.
+    - name: Select Xcode 26 for the app
+      run: |
+        set -euo pipefail
+        XCODE=$(ls -d /Applications/Xcode_26*.app 2>/dev/null | sort -V | tail -n 1 || true)
+        if [ -z "$XCODE" ]; then
+          echo "::error::No Xcode 26 on this runner image"; ls -d /Applications/Xcode*.app; exit 1
+        fi
+        echo "Using $XCODE"
+        sudo xcode-select -s "$XCODE/Contents/Developer"
+        xcodebuild -version
+
     - name: Build macOS app
       run: flutter build macos --release --dart-define=DEBRIFY_LOCAL_VALIDATION=false --dart-define-from-file="${{ runner.temp }}/nextup-build-config.json"
 
