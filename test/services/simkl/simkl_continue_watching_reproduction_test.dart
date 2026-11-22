@@ -93,7 +93,7 @@ void main() {
                   },
                 ],
               };
-            case '/sync/all-items/shows/watching':
+            case '/sync/all-items/all/watching':
               body = {
                 'shows': hasNextEpisode
                     ? [
