@@ -1,0 +1,73 @@
+# Nextup for Apple platforms: native Swift rebuild
+
+This folder holds a native rewrite of Nextup for **iPhone, iPad and Mac**, written in Swift with
+SwiftUI. One codebase, one set of screens, adapted per device the way native Apple apps are
+("fits each screen": touch on iPhone/iPad, windows, sidebar, menus and keyboard shortcuts on Mac).
+
+The Flutter app on `main` stays the reference for behaviour. Nothing in this folder touches it.
+
+## Why it is phased
+
+The Flutter app is about 1,080 Dart files and 670k lines. A faithful native port is many weeks of
+work, so it is built in vertical slices. Each phase ends with an app that builds and runs on both
+platforms and does something useful end to end.
+
+## Layout
+
+```
+apple/
+  project.yml                 XcodeGen spec: one multiplatform app target (iOS 17+, macOS 14+)
+  App/                        SwiftUI app (shared by iOS and macOS)
+    Shell/                    App entry, tab bar (iPhone) / sidebar (iPad, Mac), routing, deep links
+    Home/ Search/ Detail/     Discovery screens
+    Player/                   Playback (AVKit today, engine behind a protocol)
+    Library/                  Continue Watching, watchlist, downloads
+    Settings/                 Accounts, addons, playback, looks
+    Components/               Poster cards, rails, glass surfaces, theme
+  Packages/NextupKit/         Platform-free Swift package: models, API clients, persistence
+    Core/                     HTTP client, keychain, settings store
+    Metadata/                 TMDB
+    Addons/                   Stremio addon protocol (manifest, catalogs, meta, streams)
+    Debrid/                   Real-Debrid, TorBox (AllDebrid, Premiumize, PikPak later)
+    Tracking/                 Trakt (device code), Simkl, MDBList later
+    Library/                  Continue Watching / progress store
+```
+
+Generate the Xcode project with `brew install xcodegen && cd apple && xcodegen`, then open
+`Nextup.xcodeproj`. CI does the same (`.github/workflows/apple.yml`).
+
+## Phases
+
+| Phase | Scope | Status |
+|---|---|---|
+| 0 | Project scaffold, theme, navigation shell for iPhone/iPad/Mac, CI build for both | **in this branch** |
+| 1 | TMDB home rows + search + title detail (seasons/episodes), Stremio addons (install by URL, streams), Real-Debrid + TorBox resolve, AVKit player with resume, Trakt sign-in, Continue Watching (local) | **in this branch** |
+| 2 | Better player engine for MKV/HEVC/subtitles (MPVKit or VLCKit), external subtitles (OpenSubtitles addon), audio/subtitle track menus, Now Playing / lock screen, PiP | next |
+| 3 | Trakt/Simkl/MDBList sync: scrobble, history, watchlists, Continue Watching merge (furthest point wins), calendar, `debrify://episode` deep links | |
+| 4 | Downloads: background `URLSession` downloads, season/series scopes, offline library, auto-download filters | |
+| 5 | Cloud browsing: provider file trees, AllDebrid / Premiumize / PikPak, WebDAV, media servers (Plex/Jellyfin/Emby) | |
+| 6 | IPTV (M3U/Xtream/XMLTV EPG), Reels, collections, stream badges, filters/Quick Play rules | |
+| 7 | Backup/restore compatible with the Flutter app's export format, WebDAV saved syncs, profiles | |
+| 8 | Polish: Looks (structure + palette), Mac menus/commands, iPad multitasking, accessibility, localisation, release workflow (IPA + SideStore source, DMG) | |
+
+## Cross-platform rules
+
+- Every screen is one SwiftUI view used on both platforms. `#if os(...)` is allowed only for
+  platform glue (window commands, haptics, `UIApplication`/`NSWorkspace`), never for a
+  different layout of the same feature.
+- Navigation: `TabView` on compact width, `NavigationSplitView` sidebar on regular width and Mac.
+  Same sections in the same order on both.
+- Business logic lives in `NextupKit` and never imports SwiftUI/UIKit/AppKit, so it can be unit
+  tested with `swift test` and reused for a future tvOS target.
+- Secrets (debrid keys, tracker tokens) go in the Keychain; plain preferences in `UserDefaults`.
+
+## Known gaps and things not verified
+
+- **No device testing.** Development happens without Xcode or a simulator; the CI workflow
+  compiles both platforms on a macOS runner, which is the only automated check.
+- **AVKit cannot play MKV** and many HEVC/DTS/TrueHD streams that debrid services return. Phase 2
+  replaces the engine; until then such streams show a clear "this format needs the next player"
+  error and an "Open in VLC / Infuse" action.
+- TMDB needs a read access token, supplied at build time through `TMDB_READ_ACCESS_TOKEN`
+  (Info.plist key `NXTMDBToken`) or pasted in Settings.
+- Feature parity with `main` is the goal of the whole plan, not of phase 1.

@@ -1,0 +1,76 @@
+name: Apple native build
+
+# Builds the native SwiftUI app in apple/ for iOS and macOS. This is the only
+# compile check for the Swift rewrite, so it runs on every push that touches it.
+
+on:
+  push:
+    branches: [swift]
+    paths: ['apple/**', '.github/workflows/apple.yml']
+  pull_request:
+    paths: ['apple/**', '.github/workflows/apple.yml']
+  workflow_dispatch:
+
+concurrency:
+  group: apple-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: macos-15
+    timeout-minutes: 45
+    defaults:
+      run:
+        working-directory: apple
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Show toolchain
+      run: xcodebuild -version && swift --version
+
+    - name: Test NextupKit
+      working-directory: apple/Packages/NextupKit
+      run: swift test
+
+    - name: Generate Xcode project
+      run: |
+        brew install xcodegen
+        xcodegen generate
+
+    - name: Build macOS app
+      run: |
+        set -o pipefail
+        xcodebuild -project Nextup.xcodeproj -scheme Nextup-macOS -configuration Release \
+          -destination 'generic/platform=macOS' -derivedDataPath build \
+          CODE_SIGNING_ALLOWED=NO CODE_SIGN_IDENTITY="" \
+          TMDB_READ_ACCESS_TOKEN="${{ secrets.TMDB_READ_ACCESS_TOKEN }}" build | tee build-macos.log | grep -E "error:|warning: .*NextupKit|BUILD" || true
+        test -d build/Build/Products/Release/Nextup.app
+
+    - name: Build iOS app
+      run: |
+        set -o pipefail
+        xcodebuild -project Nextup.xcodeproj -scheme Nextup-iOS -configuration Release \
+          -destination 'generic/platform=iOS' -derivedDataPath build \
+          CODE_SIGNING_ALLOWED=NO CODE_SIGN_IDENTITY="" \
+          TMDB_READ_ACCESS_TOKEN="${{ secrets.TMDB_READ_ACCESS_TOKEN }}" build | tee build-ios.log | grep -E "error:|BUILD" || true
+        test -d build/Build/Products/Release-iphoneos/Nextup.app
+
+    - name: Package unsigned builds
+      run: |
+        mkdir -p out/Payload
+        cp -R build/Build/Products/Release-iphoneos/Nextup.app out/Payload/
+        (cd out && zip -qry Nextup-native-unsigned.ipa Payload)
+        ditto -c -k --keepParent build/Build/Products/Release/Nextup.app out/Nextup-native-macOS.zip
+
+    - uses: actions/upload-artifact@v4
+      with:
+        name: nextup-native
+        path: |
+          apple/out/Nextup-native-unsigned.ipa
+          apple/out/Nextup-native-macOS.zip
+
+    - uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: build-logs
+        path: apple/build-*.log

@@ -1,0 +1,7 @@
+Nextup.xcodeproj/
+Generated/
+build/
+DerivedData/
+.build/
+.swiftpm/
+*.xcuserstate
