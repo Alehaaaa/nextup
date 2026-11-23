@@ -32,6 +32,9 @@ struct NextupApp: App {
     #endif
 
     init() {
+        // Artwork is fetched by AsyncImage through the shared session: a larger cache stops posters
+        // reloading (and flashing) every time a row scrolls back into view.
+        URLCache.shared = URLCache(memoryCapacity: 96 << 20, diskCapacity: 768 << 20)
         let model = AppModel()
         _model = State(initialValue: model)
         _sync = State(initialValue: SyncController(model: model))

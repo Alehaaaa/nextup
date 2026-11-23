@@ -13,14 +13,15 @@ struct HomeView: View {
     @Environment(AppModel.self) private var model
     @State private var rails: [HomeRail] = []
     @State private var heroes: [MediaItem] = []
+    @State private var heroLogos: [String: URL] = [:]
     @State private var isLoading = false
     @State private var loadError: String?
 
     var body: some View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 30) {
-                if !heroes.isEmpty {
-                    HeroCarousel(items: heroes)
+                if !heroes.isEmpty && model.preferences.showHero {
+                    HeroCarousel(items: heroes, logos: heroLogos)
                 }
 
                 let continueWatching = model.continueWatching()
@@ -49,13 +50,13 @@ struct HomeView: View {
             .padding(.bottom, 40)
         }
         .scrollEdgeEffectStyle(.soft, for: .top)
-        .ignoresSafeArea(edges: heroes.isEmpty ? [] : .top)
+        .ignoresSafeArea(edges: heroes.isEmpty || !model.preferences.showHero ? [] : .top)
         .overlay { if isLoading && rails.isEmpty { ProgressView().controlSize(.large) } }
         .navigationTitle("Home")
         .toolbar(removing: .title)
         .toolbar { SettingsToolbarItem() }
         .refreshable { await load() }
-        .task(id: "\(model.accountsRevision)-\(model.addons.count)") { await load() }
+        .task(id: "\(model.accountsRevision)-\(model.addons.count)-\(model.preferences.showTop10)-\(model.preferences.showAddonCatalogs)") { await load() }
     }
 
     @ViewBuilder
@@ -112,12 +113,15 @@ struct HomeView: View {
         let tmdb = model.tmdb
         let addonClient = model.addonClient
         let addons = model.addons.filter(\.enabled)
+        let showTop10 = model.preferences.showTop10
+        let showAddonCatalogs = model.preferences.showAddonCatalogs
 
         var loaded: [(Int, HomeRail)] = []
         await withTaskGroup(of: (Int, HomeRail?).self) { group in
             if tmdb.isConfigured {
                 for (i, list) in TMDBClient.ListKind.allCases.enumerated() {
                     let style = Self.style(for: list)
+                    if style == .top10 && !showTop10 { continue }
                     group.addTask {
                         let items = (try? await tmdb.list(list)) ?? []
                         guard !items.isEmpty else { return (i, nil) }
@@ -128,7 +132,7 @@ struct HomeView: View {
             }
             // Addon catalogs follow, in the order the addons are listed in Settings.
             var order = 100
-            for addon in addons {
+            for addon in showAddonCatalogs ? addons : [] {
                 for catalog in addon.manifest.catalogs where !catalog.requiresInput && ["movie", "series"].contains(catalog.type) {
                     let slot = order
                     order += 1
@@ -148,6 +152,17 @@ struct HomeView: View {
         }
         rails = loaded.sorted { $0.0 < $1.0 }.map(\.1)
         heroes = Array((rails.first?.rail.items ?? []).filter { $0.backdropURL != nil }.prefix(6))
+        if tmdb.isConfigured {
+            var logos: [String: URL] = [:]
+            await withTaskGroup(of: (String, URL?).self) { group in
+                for hero in heroes {
+                    guard let id = hero.tmdbID else { continue }
+                    group.addTask { (hero.id, try? await tmdb.logo(kind: hero.kind, tmdbID: id)) }
+                }
+                for await (id, url) in group { if let url { logos[id] = url } }
+            }
+            heroLogos = logos
+        }
         if rails.isEmpty && (tmdb.isConfigured || !addons.isEmpty) {
             loadError = "Nothing loaded. Check your connection, TMDB token and addons."
         }
@@ -164,13 +179,14 @@ private struct RankedItem: Identifiable {
 /// glass toolbar and sidebar, and the controls sit on Liquid Glass.
 private struct HeroCarousel: View {
     let items: [MediaItem]
+    let logos: [String: URL]
     @State private var page: String?
 
     var body: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             LazyHStack(spacing: 0) {
                 ForEach(items) { item in
-                    HeroPage(item: item)
+                    HeroPage(item: item, logoURL: logos[item.id])
                         .containerRelativeFrame(.horizontal)
                         .id(item.id)
                 }
@@ -180,11 +196,25 @@ private struct HeroCarousel: View {
         .scrollTargetBehavior(.paging)
         .scrollPosition(id: $page)
         .frame(height: HeroPage.height)
+        .overlay(alignment: .bottom) {
+            // Page dots, like the system page control.
+            HStack(spacing: 7) {
+                ForEach(items) { item in
+                    Circle()
+                        .fill(item.id == (page ?? items.first?.id) ? AnyShapeStyle(.primary) : AnyShapeStyle(.tertiary))
+                        .frame(width: 7, height: 7)
+                }
+            }
+            .padding(.bottom, 10)
+            .accessibilityHidden(true)
+        }
     }
 }
 
 private struct HeroPage: View {
+    @Environment(AppModel.self) private var model
     let item: MediaItem
+    var logoURL: URL?
 
     static var height: CGFloat {
         #if os(macOS)
@@ -208,11 +238,21 @@ private struct HeroPage: View {
                 ], startPoint: .top, endPoint: .bottom)
                 // Centered, title-card style, like a TV app's featured slot.
                 VStack(spacing: 12) {
-                    Text(item.title)
-                        .font(.largeTitle.bold())
-                        .multilineTextAlignment(.center)
-                        .lineLimit(2)
-                        .minimumScaleFactor(0.6)
+                    if let logoURL {
+                        AsyncImage(url: logoURL) { image in
+                            image.resizable().scaledToFit()
+                        } placeholder: {
+                            Color.clear
+                        }
+                        .frame(maxWidth: 320, maxHeight: 120)
+                        .accessibilityLabel(item.title)
+                    } else {
+                        Text(item.title)
+                            .font(.largeTitle.bold())
+                            .multilineTextAlignment(.center)
+                            .lineLimit(2)
+                            .minimumScaleFactor(0.6)
+                    }
                     HeroFacts(item: item)
                     if !item.overview.isEmpty {
                         Text(item.overview)
@@ -222,11 +262,22 @@ private struct HeroPage: View {
                             .multilineTextAlignment(.center)
                             .frame(maxWidth: 720)
                     }
-                    NavigationLink("More", value: item)
-                        .buttonStyle(.glass)
+                    GlassEffectContainer {
+                        HStack(spacing: 10) {
+                            NavigationLink(value: item) { Label("Details", systemImage: "info.circle") }
+                                .buttonStyle(.glassProminent)
+                            Button { model.toggleWatchlist(item) } label: {
+                                Label("Watchlist", systemImage: model.isOnWatchlist(item) ? "bookmark.fill" : "bookmark")
+                                    .labelStyle(.iconOnly)
+                            }
+                            .buttonStyle(.glass)
+                            .buttonBorderShape(.circle)
+                        }
+                    }
+                    .controlSize(.large)
                 }
                 .padding(.horizontal, Theme.gutter)
-                .padding(.bottom, 32)
+                .padding(.bottom, 36)
         }
     }
 }
@@ -253,7 +304,7 @@ private struct GetStartedCard: View {
         ContentUnavailableView {
             Label("Set up Nextup", systemImage: "sparkles")
         } description: {
-            Text(error ?? "Add a TMDB token for Home rows and search, install addons for catalogs and streams, and connect Real-Debrid or TorBox to play.")
+            Text(error ?? "Add a TMDB token for Home rows and search, install addons for catalogs and streams, and connect a debrid service to play.")
         } actions: {
             #if os(macOS)
             SettingsLink { Text("Open Settings") }

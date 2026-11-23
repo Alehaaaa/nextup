@@ -39,6 +39,16 @@ struct SettingsView: View {
 
             Section {
                 NavigationLink {
+                    PlaybackSettingsView()
+                } label: {
+                    LabeledContent("Playback & Sources", value: model.preferences.sourceSort.title)
+                }
+                NavigationLink {
+                    HomeSettingsView()
+                } label: {
+                    Text("Home")
+                }
+                NavigationLink {
                     Form { AddonsSection() }.formStyle(.grouped).navigationTitle("Addons")
                 } label: {
                     LabeledContent("Addons", value: "\(model.addons.filter(\.enabled).count) on")
@@ -308,5 +318,69 @@ private struct AboutSection: View {
             Text("Nextup is an unofficial fork of Debrify. It is not affiliated with or endorsed by the Debrify project.")
                 .font(.footnote).foregroundStyle(.secondary)
         }
+    }
+}
+
+// MARK: Playback & Sources
+
+private struct PlaybackSettingsView: View {
+    @Environment(AppModel.self) private var model
+
+    var body: some View {
+        @Bindable var model = model
+        Form {
+            Section {
+                Toggle("Play Next Episode Automatically", isOn: $model.preferences.autoplayNextEpisode)
+                if model.preferences.autoplayNextEpisode {
+                    Stepper("Up Next Countdown: \(model.preferences.upNextCountdown) s",
+                            value: $model.preferences.upNextCountdown, in: 3...30)
+                }
+                Toggle("Show Skip Intro", isOn: $model.preferences.showSkipIntro)
+                Toggle("Skip Intros Automatically", isOn: $model.preferences.autoSkipIntro)
+            } header: {
+                Text("Playback")
+            } footer: {
+                Text("Intro and credits times come from SkipDB, TheIntroDB and IntroDB. Without credits data, Up Next appears 35 seconds before the end.")
+            }
+
+            Section {
+                Picker("Sort Sources", selection: $model.preferences.sourceSort) {
+                    ForEach(SourceSort.allCases) { Text($0.title).tag($0) }
+                }
+                Picker("Highest Quality", selection: $model.preferences.maxQuality) {
+                    Text("No Limit").tag(0)
+                    ForEach([StreamQuality.uhd2160, .hd1080, .hd720], id: \.self) { Text($0.label).tag($0.rawValue) }
+                }
+                Toggle("Cached Sources First", isOn: $model.preferences.cachedFirst)
+                Toggle("Hide CAM and Telesync", isOn: $model.preferences.hideLowQualitySources)
+            } header: {
+                Text("Sources")
+            } footer: {
+                Text("Also used when Nextup picks a source by itself: Up Next, season downloads and Play Best Source.")
+            }
+        }
+        .formStyle(.grouped)
+        .navigationTitle("Playback & Sources")
+    }
+}
+
+// MARK: Home
+
+private struct HomeSettingsView: View {
+    @Environment(AppModel.self) private var model
+
+    var body: some View {
+        @Bindable var model = model
+        Form {
+            Section {
+                Toggle("Featured Carousel", isOn: $model.preferences.showHero)
+                Toggle("Top 10 Rows", isOn: $model.preferences.showTop10)
+                Toggle("Addon Catalog Rows", isOn: $model.preferences.showAddonCatalogs)
+            } footer: {
+                Text("Continue Watching always comes first. Addon rows follow the order of your addons.")
+            }
+        }
+        .formStyle(.grouped)
+        .navigationTitle("Home")
     }
 }

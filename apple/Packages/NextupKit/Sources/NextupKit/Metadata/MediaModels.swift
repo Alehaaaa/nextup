@@ -106,6 +106,23 @@ public struct MediaDetail: Hashable, Codable, Sendable {
     public var cast: [CastMember]
     public var trailerYouTubeKey: String?
     public var similar: [MediaItem]
+    /// The title's logo (TMDB "clear logo"), drawn instead of plain text in the title page header.
+    public var logoURL: URL?
+    /// Age rating for the user's region, else the US one ("PG-13", "TV-MA").
+    public var certification: String?
+    /// "Returning Series", "Ended", "Released"…
+    public var status: String?
+    /// Directors for movies, creators for shows.
+    public var creators: [String] = []
+    public var writers: [String] = []
+    /// Studios for movies, networks for shows.
+    public var studios: [String] = []
+    public var originalLanguage: String?
+    public var releaseDate: Date?
+    public var voteCount: Int?
+    public var episodeCount: Int?
+    public var budget: Int?
+    public var revenue: Int?
 
     public init(item: MediaItem, genres: [String] = [], runtimeMinutes: Int? = nil, tagline: String? = nil,
                 seasons: [SeasonSummary] = [], cast: [CastMember] = [], trailerYouTubeKey: String? = nil,

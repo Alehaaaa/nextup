@@ -13,12 +13,13 @@ public protocol SecretStoring: Sendable {
 public enum SecretKey {
     public static let realDebridToken = "realdebrid.apiKey"
     public static let torboxToken = "torbox.apiKey"
+    public static let allDebridToken = "alldebrid.apiKey"
     public static let tmdbToken = "tmdb.readAccessToken"
     public static let traktSession = "trakt.session"
     public static let webDAVPassword = "webdav.password"
 
     /// What sync carries between the user's devices.
-    public static let synced = [realDebridToken, torboxToken, tmdbToken, traktSession]
+    public static let synced = [realDebridToken, torboxToken, allDebridToken, tmdbToken, traktSession]
 }
 
 public final class KeychainSecretStore: SecretStoring, @unchecked Sendable {

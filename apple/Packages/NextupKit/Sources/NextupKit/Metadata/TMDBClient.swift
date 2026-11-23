@@ -69,13 +69,14 @@ public struct TMDBClient: Sendable {
     public func detail(kind: MediaKind, tmdbID: Int) async throws -> MediaDetail {
         let raw: Detail = try await get(
             "/\(kind.tmdbPath)/\(tmdbID)",
-            ["append_to_response": "external_ids,credits,videos,recommendations"]
+            ["append_to_response": "external_ids,credits,videos,recommendations,images,release_dates,content_ratings",
+             "include_image_language": "\(languageCode),en,null"]
         )
         var item = raw.asResult.item(defaultKind: kind) ?? MediaItem(kind: kind, tmdbID: tmdbID, title: "")
         item.imdbID = raw.imdb_id ?? raw.external_ids?.imdb_id
         let trailer = raw.videos?.results.first { $0.site == "YouTube" && $0.type == "Trailer" }
             ?? raw.videos?.results.first { $0.site == "YouTube" }
-        return MediaDetail(
+        var detail = MediaDetail(
             item: item,
             genres: raw.genres?.map(\.name) ?? [],
             runtimeMinutes: raw.runtime ?? raw.episode_run_time?.first,
@@ -91,7 +92,47 @@ public struct TMDBClient: Sendable {
             trailerYouTubeKey: trailer?.key,
             similar: (raw.recommendations?.results ?? []).compactMap { $0.item(defaultKind: kind) }
         )
+        let logos = raw.images?.logos ?? []
+        let logo = logos.first { $0.iso_639_1 == languageCode } ?? logos.first { $0.iso_639_1 == "en" } ?? logos.first
+        detail.logoURL = Self.image(logo?.file_path, "w500")
+        let region = Locale.current.region?.identifier ?? "US"
+        if kind == .movie {
+            let entries = raw.release_dates?.results ?? []
+            let pick = { (code: String) -> String? in
+                entries.first { $0.iso_3166_1 == code }?.release_dates.compactMap { $0.certification?.isEmpty == false ? $0.certification : nil }.first
+            }
+            detail.certification = pick(region) ?? pick("US")
+            detail.creators = (raw.credits?.crew ?? []).filter { $0.job == "Director" }.map(\.name)
+            detail.writers = Array((raw.credits?.crew ?? []).filter { $0.department == "Writing" }.map(\.name).uniqued().prefix(3))
+            detail.studios = (raw.production_companies ?? []).prefix(2).map(\.name)
+        } else {
+            let entries = raw.content_ratings?.results ?? []
+            let pick = { (code: String) -> String? in entries.first { $0.iso_3166_1 == code && !($0.rating ?? "").isEmpty }?.rating }
+            detail.certification = pick(region) ?? pick("US")
+            detail.creators = (raw.created_by ?? []).map(\.name)
+            detail.studios = (raw.networks ?? []).prefix(2).map(\.name)
+            detail.episodeCount = raw.number_of_episodes
+        }
+        detail.status = raw.status
+        detail.originalLanguage = raw.original_language.flatMap { Locale.current.localizedString(forLanguageCode: $0) }
+        detail.releaseDate = (raw.release_date ?? raw.first_air_date).flatMap(Self.dateFormatter.date(from:))
+        detail.voteCount = raw.vote_count
+        detail.budget = raw.budget.flatMap { $0 > 0 ? $0 : nil }
+        detail.revenue = raw.revenue.flatMap { $0 > 0 ? $0 : nil }
+        return detail
     }
+
+    /// The title's logo image (a transparent "clear logo"), preferring the app language, then English.
+    public func logo(kind: MediaKind, tmdbID: Int) async throws -> URL? {
+        let images: Detail.Images = try await get("/\(kind.tmdbPath)/\(tmdbID)/images",
+                                                  ["include_image_language": "\(languageCode),en,null"])
+        let logos = images.logos ?? []
+        let logo = logos.first { $0.iso_639_1 == languageCode } ?? logos.first { $0.iso_639_1 == "en" } ?? logos.first
+        return Self.image(logo?.file_path, "w500")
+    }
+
+    /// "es" from "es-ES".
+    var languageCode: String { String(language.prefix(while: { $0 != "-" })) }
 
     public func season(tmdbID: Int, number: Int) async throws -> [Episode] {
         let raw: SeasonDetail = try await get("/tv/\(tmdbID)/season/\(number)", [:])
@@ -199,7 +240,25 @@ public struct TMDBClient: Sendable {
         struct External: Decodable { let imdb_id: String? }
         struct Credits: Decodable {
             struct Cast: Decodable { let id: Int; let name: String; let character: String?; let profile_path: String? }
+            struct Crew: Decodable { let name: String; let job: String?; let department: String? }
             let cast: [Cast]
+            let crew: [Crew]?
+        }
+        struct Images: Decodable {
+            struct Image: Decodable { let file_path: String; let iso_639_1: String? }
+            let logos: [Image]?
+        }
+        struct ReleaseDates: Decodable {
+            struct Country: Decodable {
+                struct Entry: Decodable { let certification: String? }
+                let iso_3166_1: String
+                let release_dates: [Entry]
+            }
+            let results: [Country]
+        }
+        struct ContentRatings: Decodable {
+            struct Rating: Decodable { let iso_3166_1: String; let rating: String? }
+            let results: [Rating]
         }
         struct Videos: Decodable {
             struct Video: Decodable { let key: String; let site: String; let type: String }
@@ -226,6 +285,18 @@ public struct TMDBClient: Sendable {
         let credits: Credits?
         let videos: Videos?
         let recommendations: Page<Title>?
+        let images: Images?
+        let release_dates: ReleaseDates?
+        let content_ratings: ContentRatings?
+        let created_by: [Named]?
+        let networks: [Named]?
+        let production_companies: [Named]?
+        let status: String?
+        let original_language: String?
+        let vote_count: Int?
+        let number_of_episodes: Int?
+        let budget: Int?
+        let revenue: Int?
 
         var asResult: Title {
             Title(id: id, media_type: nil, title: title, name: name, overview: overview, poster_path: poster_path,
@@ -249,5 +320,13 @@ public struct TMDBClient: Sendable {
     struct FindResult: Decodable {
         let movie_results: [Title]
         let tv_results: [Title]
+    }
+}
+
+extension Sequence where Element: Hashable {
+    /// Keeps the first of each value, in order.
+    func uniqued() -> [Element] {
+        var seen = Set<Element>()
+        return filter { seen.insert($0).inserted }
     }
 }

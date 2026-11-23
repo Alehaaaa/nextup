@@ -14,6 +14,7 @@ struct TitleDetailView: View {
     @State private var pendingPlayback: PlaybackRequest?
     @State private var downloadMessage: String?
     @Environment(\.play) private var play
+    @Environment(\.openURL) private var openURL
     @Environment(\.isCompactWidth) private var isCompact
     @State private var error: String?
 
@@ -35,6 +36,7 @@ struct TitleDetailView: View {
                 }
                 if item.kind == .series { episodesSection }
                 if let cast = detail?.cast, !cast.isEmpty { castRail(cast) }
+                if let detail { AboutTitleSection(item: item, detail: detail).padding(.horizontal, Theme.gutter) }
                 if let similar = detail?.similar, !similar.isEmpty {
                     PosterRail(title: "More Like This", items: similar) { other in
                         NavigationLink(value: other) { PosterCard(item: other) }.buttonStyle(.plain)
@@ -79,13 +81,21 @@ struct TitleDetailView: View {
                 .init(color: Theme.background, location: 1),
             ], startPoint: .top, endPoint: .bottom)
             VStack(spacing: 10) {
-                Text(item.title)
-                    .font(isCompact ? .largeTitle.bold() : .title.bold())
-                    .multilineTextAlignment(.center)
-                    .lineLimit(3)
-                    .minimumScaleFactor(0.7)
-                if !facts.isEmpty {
-                    Text(facts).font(.subheadline.weight(.medium))
+                TitleLogo(title: item.title, logoURL: detail?.logoURL, compact: isCompact)
+                if !facts.isEmpty || detail?.certification != nil {
+                    HStack(spacing: 8) {
+                        if let rating = detail?.certification {
+                            Text(rating)
+                                .font(.caption.weight(.bold))
+                                .padding(.horizontal, 5).padding(.vertical, 1)
+                                .overlay(RoundedRectangle(cornerRadius: 4).stroke(.secondary, lineWidth: 1))
+                        }
+                        Text(facts).font(.subheadline.weight(.medium))
+                    }
+                }
+                if let genres = detail?.genres, !genres.isEmpty {
+                    Text(genres.prefix(3).joined(separator: " · "))
+                        .font(.footnote).foregroundStyle(.secondary)
                 }
                 if !item.overview.isEmpty {
                     Text(item.overview)
@@ -124,9 +134,13 @@ struct TitleDetailView: View {
     private var facts: String {
         var parts: [String] = []
         if let year = item.year { parts.append(String(year)) }
-        if let runtime = Format.runtime(detail?.runtimeMinutes) { parts.append(runtime) }
-        if let genres = detail?.genres, !genres.isEmpty { parts.append(genres.prefix(2).joined(separator: ", ")) }
-        if let rating = item.rating { parts.append(String(format: "★ %.1f", rating)) }
+        if item.kind == .series, let seasons = detail?.seasons.count, seasons > 0 {
+            parts.append(seasons == 1 ? "1 Season" : "\(seasons) Seasons")
+        } else if let runtime = Format.runtime(detail?.runtimeMinutes) {
+            parts.append(runtime)
+        }
+        if let rating = item.rating, rating > 0 { parts.append(String(format: "★ %.1f", rating)) }
+        if item.kind == .series, let status = detail?.status, status == "Ended" || status == "Canceled" { parts.append(status) }
         return parts.joined(separator: " · ")
     }
 
@@ -159,6 +173,9 @@ struct TitleDetailView: View {
                 }
                 actionButton("Watchlist", symbol: model.isOnWatchlist(item) ? "bookmark.fill" : "bookmark") {
                     model.toggleWatchlist(item)
+                }
+                if let key = detail?.trailerYouTubeKey, let url = URL(string: "https://www.youtube.com/watch?v=\(key)") {
+                    actionButton("Trailer", symbol: "film") { openURL(url) }
                 }
                 downloadButton
             }
@@ -269,7 +286,8 @@ struct TitleDetailView: View {
                     LazyHStack(alignment: .top, spacing: 14) {
                         ForEach(episodes) { episode in
                             Button { openSources(for: episode) } label: {
-                                EpisodeCard(episode: episode, progress: progress(for: episode), width: isCompact ? 250 : 340)
+                                EpisodeCard(episode: episode, progress: progress(for: episode), watched: isWatched(episode),
+                                            width: isCompact ? 260 : 340)
                             }
                             .buttonStyle(.plain)
                             .contextMenu { episodeMenu(episode) }
@@ -310,6 +328,13 @@ struct TitleDetailView: View {
 
     private func openSources(for episode: Episode, intent: SourceIntent = .play) {
         open(SourceTarget(item: item, season: episode.season, episode: episode.number, episodeTitle: episode.title, intent: intent))
+    }
+
+    /// Finished, or before the episode Continue Watching is on.
+    private func isWatched(_ episode: Episode) -> Bool {
+        guard let entry = resumeEntry, let s = entry.season, let e = entry.episode else { return false }
+        if episode.season != s { return episode.season < s }
+        return episode.number < e || (episode.number == e && entry.isFinished)
     }
 
     private func progress(for episode: Episode) -> Double? {
@@ -391,31 +416,147 @@ struct TitleDetailView: View {
     }
 }
 
-/// A landscape card in the episode rail: still, progress, "E1 • Title", runtime.
+/// A landscape card in the episode rail: still with progress, "E1 · Title", air date or runtime, and the synopsis.
 private struct EpisodeCard: View {
     let episode: Episode
     var progress: Double?
+    var watched: Bool
     var width: CGFloat
+
+    private var isUpcoming: Bool { episode.airDate.map { $0 > Date() } ?? false }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             ArtworkImage(url: episode.stillURL)
                 .frame(width: width, height: width * 9 / 16)
                 .overlay(alignment: .bottom) {
-                    if let progress, progress > 0 {
+                    if let progress, progress > 0, !watched {
                         ProgressView(value: progress)
                             .padding(.horizontal, 10).padding(.bottom, 10)
                     }
                 }
+                .overlay(alignment: .topTrailing) {
+                    if watched {
+                        Image(systemName: "checkmark.circle.fill")
+                            .font(.title3)
+                            .symbolRenderingMode(.palette)
+                            .foregroundStyle(.white, .tint)
+                            .padding(8)
+                    }
+                }
                 .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-            (Text("E\(episode.number)  •  ").foregroundStyle(.secondary) + Text(episode.title).fontWeight(.semibold))
+                .opacity(isUpcoming ? 0.55 : 1)
+            (Text("E\(episode.number)  ·  ").foregroundStyle(.secondary) + Text(episode.title).fontWeight(.semibold))
                 .font(.subheadline)
                 .lineLimit(1)
-            if let runtime = Format.runtime(episode.runtimeMinutes) {
-                Text(runtime).font(.caption).foregroundStyle(.secondary)
+            Text(meta).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+            if !episode.overview.isEmpty {
+                Text(episode.overview)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(2, reservesSpace: true)
             }
         }
         .frame(width: width, alignment: .leading)
         .contentShape(Rectangle())
+    }
+
+    private var meta: String {
+        var parts: [String] = []
+        if let date = episode.airDate {
+            parts.append(isUpcoming ? "Airs " + date.formatted(date: .abbreviated, time: .omitted)
+                                    : date.formatted(date: .abbreviated, time: .omitted))
+        }
+        if let runtime = Format.runtime(episode.runtimeMinutes) { parts.append(runtime) }
+        return parts.isEmpty ? " " : parts.joined(separator: " · ")
+    }
+}
+
+/// The title's logo when TMDB has one, else its name in large type.
+private struct TitleLogo: View {
+    let title: String
+    let logoURL: URL?
+    let compact: Bool
+
+    var body: some View {
+        if let logoURL {
+            AsyncImage(url: logoURL) { phase in
+                if let image = phase.image {
+                    image.resizable().scaledToFit()
+                } else {
+                    text.opacity(phase.error == nil ? 0 : 1)
+                }
+            }
+            .frame(maxWidth: compact ? 300 : 420, maxHeight: compact ? 120 : 140)
+            .accessibilityLabel(title)
+        } else {
+            text
+        }
+    }
+
+    private var text: some View {
+        Text(title)
+            .font(compact ? .largeTitle.bold() : .title.bold())
+            .multilineTextAlignment(.center)
+            .lineLimit(3)
+            .minimumScaleFactor(0.7)
+    }
+}
+
+/// Tagline, full synopsis and the facts table (director, studio, release, language…).
+private struct AboutTitleSection: View {
+    let item: MediaItem
+    let detail: MediaDetail
+    @State private var expanded = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("About").font(.title3.weight(.bold))
+            if let tagline = detail.tagline {
+                Text(tagline).font(.subheadline.italic()).foregroundStyle(.secondary)
+            }
+            if !item.overview.isEmpty {
+                Text(item.overview)
+                    .font(.subheadline)
+                    .lineLimit(expanded ? nil : 4)
+                    .onTapGesture { withAnimation(.smooth) { expanded.toggle() } }
+            }
+            Grid(alignment: .leadingFirstTextBaseline, horizontalSpacing: 16, verticalSpacing: 8) {
+                ForEach(rows, id: \.0) { row in
+                    GridRow {
+                        Text(row.0).foregroundStyle(.secondary)
+                        Text(row.1)
+                    }
+                }
+            }
+            .font(.subheadline)
+        }
+        .frame(maxWidth: 820, alignment: .leading)
+    }
+
+    private var rows: [(String, String)] {
+        var rows: [(String, String)] = []
+        if !detail.creators.isEmpty {
+            rows.append((item.kind == .movie ? (detail.creators.count > 1 ? "Directors" : "Director") : "Created by",
+                         detail.creators.joined(separator: ", ")))
+        }
+        if !detail.writers.isEmpty { rows.append(("Writers", detail.writers.joined(separator: ", "))) }
+        let stars = detail.cast.prefix(4).map(\.name)
+        if !stars.isEmpty { rows.append(("Stars", stars.joined(separator: ", "))) }
+        if !detail.genres.isEmpty { rows.append(("Genres", detail.genres.joined(separator: ", "))) }
+        if let date = detail.releaseDate {
+            rows.append((item.kind == .movie ? "Released" : "First aired", date.formatted(date: .long, time: .omitted)))
+        }
+        if let status = detail.status { rows.append(("Status", status)) }
+        if item.kind == .series, let count = detail.episodeCount, count > 0 { rows.append(("Episodes", "\(count)")) }
+        if let runtime = Format.runtime(detail.runtimeMinutes) { rows.append(("Runtime", runtime)) }
+        if !detail.studios.isEmpty { rows.append((item.kind == .movie ? "Studio" : "Network", detail.studios.joined(separator: ", "))) }
+        if let language = detail.originalLanguage { rows.append(("Language", language)) }
+        if let rating = item.rating, rating > 0 {
+            rows.append(("TMDB", String(format: "%.1f", rating) + (detail.voteCount.map { " (\($0.formatted()) votes)" } ?? "")))
+        }
+        if let budget = detail.budget { rows.append(("Budget", budget.formatted(.currency(code: "USD").precision(.fractionLength(0))))) }
+        if let revenue = detail.revenue { rows.append(("Box office", revenue.formatted(.currency(code: "USD").precision(.fractionLength(0))))) }
+        return rows
     }
 }

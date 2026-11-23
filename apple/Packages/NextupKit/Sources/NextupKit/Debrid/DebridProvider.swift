@@ -3,6 +3,7 @@ import Foundation
 public enum DebridService: String, Codable, CaseIterable, Sendable, Identifiable {
     case realDebrid
     case torbox
+    case allDebrid
 
     public var id: String { rawValue }
 
@@ -10,6 +11,7 @@ public enum DebridService: String, Codable, CaseIterable, Sendable, Identifiable
         switch self {
         case .realDebrid: return "Real-Debrid"
         case .torbox: return "TorBox"
+        case .allDebrid: return "AllDebrid"
         }
     }
 
@@ -17,6 +19,7 @@ public enum DebridService: String, Codable, CaseIterable, Sendable, Identifiable
         switch self {
         case .realDebrid: return SecretKey.realDebridToken
         case .torbox: return SecretKey.torboxToken
+        case .allDebrid: return SecretKey.allDebridToken
         }
     }
 
@@ -24,6 +27,7 @@ public enum DebridService: String, Codable, CaseIterable, Sendable, Identifiable
         switch self {
         case .realDebrid: return URL(string: "https://real-debrid.com/apitoken")!
         case .torbox: return URL(string: "https://torbox.app/settings")!
+        case .allDebrid: return URL(string: "https://alldebrid.com/apikeys/")!
         }
     }
 }

@@ -38,6 +38,7 @@ public enum FlutterSync {
     public struct Import: Sendable, Equatable {
         public var realDebridKey: String?
         public var torboxKey: String?
+        public var allDebridKey: String?
         public var trakt: TraktSession?
         public var addonURLs: [String] = []
         /// Connections the native app does not support yet, by label (AllDebrid, IPTV…).
@@ -46,7 +47,7 @@ public enum FlutterSync {
 
         public init() {}
 
-        public var isEmpty: Bool { realDebridKey == nil && torboxKey == nil && trakt == nil && addonURLs.isEmpty }
+        public var isEmpty: Bool { realDebridKey == nil && torboxKey == nil && allDebridKey == nil && trakt == nil && addonURLs.isEmpty }
     }
 
     // MARK: Reading a sync folder
@@ -216,6 +217,7 @@ public enum FlutterSync {
             switch type {
             case "realDebrid": result.realDebridKey = nonEmpty(secret?["apiKey"]) ?? result.realDebridKey
             case "torbox": result.torboxKey = nonEmpty(secret?["apiKey"]) ?? result.torboxKey
+            case "allDebrid": result.allDebridKey = nonEmpty(secret?["apiKey"]) ?? result.allDebridKey
             case "trakt":
                 if let access = nonEmpty(secret?["accessToken"]), let refresh = nonEmpty(secret?["refreshToken"]) {
                     let expiry = (secret?["expiryMs"] as? Int).map { Date(timeIntervalSince1970: Double($0) / 1000) } ?? Date()

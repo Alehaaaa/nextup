@@ -97,6 +97,7 @@ public enum DebridFactory {
         switch service {
         case .realDebrid: return RealDebridClient(apiKey: key)
         case .torbox: return TorBoxClient(apiKey: key)
+        case .allDebrid: return AllDebridClient(apiKey: key)
         }
     }
 }

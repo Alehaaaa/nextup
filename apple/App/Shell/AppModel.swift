@@ -17,6 +17,7 @@ final class AppModel {
     var preferredDebrid: DebridService? {
         didSet { defaults.defaults.set(preferredDebrid?.rawValue, forKey: Keys.preferredDebrid) }
     }
+    var preferences: Preferences { didSet { defaults.save(preferences, key: Keys.preferences) } }
     /// Saved on this device; shown in Library.
     var favorites: [MediaItem] { didSet { defaults.save(favorites, key: Keys.favorites); settingsChanged() } }
     var watchlist: [MediaItem] { didSet { defaults.save(watchlist, key: Keys.watchlist); settingsChanged() } }
@@ -40,6 +41,7 @@ final class AppModel {
         self.addons = defaults.load([InstalledAddon].self, key: Keys.addons) ?? []
         self.favorites = defaults.load([MediaItem].self, key: Keys.favorites) ?? []
         self.watchlist = defaults.load([MediaItem].self, key: Keys.watchlist) ?? []
+        self.preferences = defaults.load(Preferences.self, key: Keys.preferences) ?? Preferences()
         self.preferredDebrid = defaults.defaults.string(forKey: Keys.preferredDebrid).flatMap(DebridService.init(rawValue:))
         seedBuildTimeTMDBToken()
     }
@@ -50,6 +52,7 @@ final class AppModel {
         static let favorites = "nextup.favorites.v1"
         static let watchlist = "nextup.watchlist.v1"
         static let settingsChangedAt = "nextup.settingsChangedAt"
+        static let preferences = "nextup.preferences.v1"
     }
 
     // MARK: Sync
@@ -179,7 +182,7 @@ final class AppModel {
         case noDebrid, nothingPlayable
         var errorDescription: String? {
             switch self {
-            case .noDebrid: return "Connect Real-Debrid or TorBox in Settings to use torrent sources."
+            case .noDebrid: return "Connect Real-Debrid, TorBox or AllDebrid in Settings to use torrent sources."
             case .nothingPlayable: return "None of the sources could be opened."
             }
         }
@@ -203,10 +206,8 @@ final class AppModel {
         guard let imdb = target.item.imdbID else { throw ResolveError.nothingPlayable }
         let id = AddonClient.videoID(imdbID: imdb, season: target.season, episode: target.episode)
         let lookup = await addonClient.streams(from: addons, type: target.item.kind.stremioType, id: id)
-        let ranked = lookup.streams.enumerated()
-            .filter { $0.element.url != nil || ($0.element.infoHash != nil && activeDebrid != nil) }
-            .sorted { a, b in a.element.quality != b.element.quality ? a.element.quality > b.element.quality : a.offset < b.offset }
-            .map(\.element)
+        let ranked = preferences.arrange(lookup.streams, sort: .best)
+            .filter { $0.url != nil || ($0.infoHash != nil && activeDebrid != nil) }
         for stream in ranked.prefix(attempts) {
             if let resolved = try? await resolve(stream, for: target) { return resolved }
         }

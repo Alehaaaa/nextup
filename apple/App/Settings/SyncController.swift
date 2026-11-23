@@ -77,6 +77,9 @@ final class SyncController {
         if let key = found.torboxKey, model.secret(SecretKey.torboxToken) != key {
             model.setSecret(key, for: SecretKey.torboxToken); added.append("TorBox")
         }
+        if let key = found.allDebridKey, model.secret(SecretKey.allDebridToken) != key {
+            model.setSecret(key, for: SecretKey.allDebridToken); added.append("AllDebrid")
+        }
         if let session = found.trakt, model.trakt.session == nil {
             model.trakt.session = session
             model.accountsChanged()

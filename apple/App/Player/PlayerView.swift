@@ -35,7 +35,6 @@ final class PlayerController {
     @ObservationIgnored private var upNextDismissed = false
     @ObservationIgnored private var countdownTask: Task<Void, Never>?
 
-    static let upNextCountdown = 10
     /// Without credits data, Up Next appears this long before the end.
     static let upNextLeadTime: Double = 35
 
@@ -138,7 +137,11 @@ final class PlayerController {
     private func tick() {
         guard isReady, !isAdvancing else { return }
         let position = self.position
-        activeIntro = segments.intros.first { $0.contains(position) && !skippedIntros.contains($0.start) && $0.end - position > 2 }
+        let prefs = model.preferences
+        activeIntro = prefs.showSkipIntro || prefs.autoSkipIntro
+            ? segments.intros.first { $0.contains(position) && !skippedIntros.contains($0.start) && $0.end - position > 2 }
+            : nil
+        if prefs.autoSkipIntro, activeIntro != nil { skipIntro() }
 
         guard nextEpisode != nil, !upNextDismissed, duration > 0 else { return }
         let creditsStart = segments.outros.first?.start ?? max(0, duration - Self.upNextLeadTime)
@@ -163,8 +166,10 @@ final class PlayerController {
 
     private func showUpNext() {
         upNextVisible = true
-        countdown = Self.upNextCountdown
         countdownTask?.cancel()
+        // With autoplay off the card stays up with a Play button and no countdown.
+        guard model.preferences.autoplayNextEpisode else { countdown = 0; return }
+        countdown = max(3, model.preferences.upNextCountdown)
         countdownTask = Task { [weak self] in
             while let self, self.countdown > 0, !Task.isCancelled {
                 try? await Task.sleep(nanoseconds: 1_000_000_000)
@@ -189,7 +194,7 @@ final class PlayerController {
     }
 
     private func itemEnded() {
-        if nextEpisode != nil, !upNextDismissed {
+        if nextEpisode != nil, !upNextDismissed, model.preferences.autoplayNextEpisode {
             Task { await playNext() }
         }
     }
@@ -311,7 +316,7 @@ private struct UpNextCard: View {
                 .frame(width: 128, height: 72)
                 .clipShape(.rect(cornerRadius: 8))
             VStack(alignment: .leading, spacing: 4) {
-                Text("Up Next in \(countdown)").font(.caption).foregroundStyle(.secondary)
+                Text(countdown > 0 ? "Up Next in \(countdown)" : "Up Next").font(.caption).foregroundStyle(.secondary)
                 Text(episode.code).font(.caption.weight(.semibold))
                 Text(episode.title).font(.headline).lineLimit(1)
                 HStack {

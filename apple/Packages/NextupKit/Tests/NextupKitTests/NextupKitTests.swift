@@ -174,3 +174,30 @@ final class SyncCryptoTests: XCTestCase {
 {"authority": "{\"version\": 1, \"marker\": \"eyJjaXBoZXJ0ZXh0IjoiVDlPVjNuRmxjdHJlYW8zb0tEdys3dEl5ZmVyby9meFJ0MWgrdldmQ3BzYmdBeWVCWnd3N2dqNElSTVcrSDhtTjFpelRocFBEcXJpQzg4Z2M5TVEyRkozNUZWZUc2VVVzK0tHNjI4M0RyQndhOEp3UmFLOEYvUWMwK2ZJQ3ZPKy9HTGdwMnljNnpEVGlZNmxsYVY5SFN5aml2WGM1VXE0MThaYTRWMVFRZjFwcDUrYW5pRWtBdUNJTXIzK2dsVWFYeW9jNVJtLzkiLCJoZWFkZXIiOnsiYWVhZCI6ImFlcy0yNTYtZ2NtIiwiZW5jcnlwdGVkIjp0cnVlLCJmb3JtYXQiOiJkZWJyaWZ5LXdlYmRhdi1zeW5jLXJvb3QiLCJrZGYiOnsiYWxnb3JpdGhtIjoiYXJnb24yaWQiLCJpdGVyYXRpb25zIjoyLCJtZW1vcnlLaUIiOjY0LCJwYXJhbGxlbGlzbSI6MSwic2FsdCI6IkFBRUNBd1FGQmdjSUNRb0xEQTBPRHc9PSJ9LCJ2ZXJzaW9uIjoxfSwibm9uY2UiOiJBQUVDQXdRRkJnY0lDUW9MIn0=\", \"syncPassphrase\": \"correct horse battery staple\"}", "resources": "{\"ciphertext\":\"BNpu4GktO+uo7n1zp5R0JrwzVlvn7iGLovRrEMghvJ3a/izVcRgsjVD8EtrUj04J9vgg4UZoGRkWmTxu908EGodXGyFLHifA5n4ddNbmRkboPcW0l8KyB8BPC/Y80kpZGU2C0B8VoOiGfLLhQy+NO78sCanj7KDoCiX5JgM/u3Bafg1A2eQQLG+GgMesoi6pisGdQOJyRiy/BaaLjytmEJcGQiricCXnj9Qwr17PgHbJY9h8k1m73WZ57msQ/JBTs5puZACQ6s51k9zRVPngsoyKHrmNHSa0UJpEZEBDrWE3TJdvtLd0UoqjtS615C5gjj69k1iz3XY+Pr4YLdAYVvNTnwvCVWMiUXqnN68+DqK/4QJnOQyKL1NemuZ6jvD02eJbZQQDIMhY6OU9IBum1LbxyisyfkKElz2QFOes62HsoBL09IlzSmOXWti1kaqH9PcP6N2FsvE8h0Z1RGtqy7h7fV80hVYDqAFCFgqva6iaDvDp3oMJclloKxCV4NeYwiWWi8yieh/R+V156GBEzeAUCkbcHypSkwod0TEEvcFxB2widC6NSWkx3M4GYqQItjE41/L3ityZWcTFvP91slfp4u64G3NlRdVrpMMJJShhKoGdQQX6lJfniGlBQhwPXGGYGMlkIM0qHpKfddbTEW4JqTl7MPRpXwflvBByajWjOuwXxyRLyy23iASZ+5m8RhX1AY/eg2ua2cZc3QoaYlnT0pWEDDa4i3cRQ9DM0Fnl/6rhJIbKkRsDhY1BiK2dRQlpFAKnUlzmG3M5wGvj6OdG9xt6q+9U/MRNGKFBC+2lLKVQgV8dtjLqfgp6UObgGxuGNQbPFANDpSVli14Pjmi4NFu7VWLlNyVEksbyWsXAFt5P+Yjzw3pJo95R+RDIgzUgv7sf+05Rrzh6D4paVcVNoXn4+NV6MeU7NJgNbo8M/Zw29hBz5JhYXJL8FbyFkf2FOCy2FfcQEKjuItFrueSWVplMkmSVC+AtNmwgOfO1ftzVcqhsXdIsXkNVdn9yVltKzAasOnX8UPl33RAkAnadqQy8TVz89W6qIuQkjURVxIPdRGZrJIVd3xKicbyvQzim3DmlMinDVekf41eN0IesUmEHb5j0qySmo3dq64z1yGBywwTRLDp3B8D2NKwDK1Y+4Vq7boxsrBHfDyMpa0HwZmM5fW8trkTSYF2sEIkvj0rcnrYlz9CEhGBZzR7BixzhK6FCRfYt2BJVvC88l8EuZcO3Ikx62/EEyJRBVrcy13UdFZFhDgkYhNkl5lFR91R7cQpDisjZNSjBlAzcvgKFweGyV7mMkR4+Xrz9j7py8zt16NU2PxT1dzso0m6dJPW4qyPoezaROWeOrJsbyqo7da7SDO4FptiXkkLW1JR83qfIQJUa7yoOu3bmicz3vBC3Oz06UMC+sIS2k/hIIewCYt9n2P/uJEdzyPI05gBAFNCUQ8AFkCoAtnqb0z8Fqvd9Jg1qiX6x\",\"header\":{\"aead\":\"aes-256-gcm\",\"circleId\":\"circle1\",\"deviceId\":\"devA\",\"format\":\"debrify-webdav-sync-document\",\"logicalName\":\"resources\",\"schemaVersion\":1,\"version\":1},\"nonce\":\"BQUFBQUFBQUFBQUF\"}", "resourcesSha": "b59aeed84147661b4b4ff8710aa9a3e13e504b744e21b20c40621bffb4f74af5"}
 """#
 }
+
+final class StreamTraitsTests: XCTestCase {
+    func testTorrentioStyleLabel() {
+        var stream = StremioStream()
+        stream.name = "[RD+] Torrentio\n4k DV | HDR"
+        stream.title = "Movie.2024.2160p.UHD.BluRay.REMUX.DV.HDR.HEVC.TrueHD.Atmos.7.1-FGT\n👤 152 💾 58.3 GB ⚙️ ThePirateBay\n🇬🇧 / 🇪🇸"
+        let t = stream.traits
+        XCTAssertEqual(t.quality, .uhd2160)
+        XCTAssertEqual(t.hdr, ["DV", "HDR"])
+        XCTAssertEqual(t.codec, "HEVC")
+        XCTAssertEqual(t.source, "REMUX")
+        XCTAssertEqual(t.audio, ["Atmos", "TrueHD", "7.1"])
+        XCTAssertEqual(t.seeders, 152)
+        XCTAssertEqual(t.cache, .cached)
+        XCTAssertEqual(t.languages, ["🇬🇧", "🇪🇸"])
+        XCTAssertEqual(t.group, "FGT")
+    }
+
+    func testCamIsLowQuality() {
+        var stream = StremioStream()
+        stream.name = "[RD download] Torrentio\n720p"
+        stream.title = "Movie.2025.HDCAM.x264-XYZ"
+        XCTAssertTrue(stream.traits.isLowQualitySource)
+        XCTAssertEqual(stream.traits.cache, .notCached)
+        XCTAssertEqual(stream.traits.codec, "AVC")
+    }
+}

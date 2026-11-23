@@ -105,12 +105,12 @@ Status: ✅ in the native app · 🟡 partial · ⬜ not started. Android TV / t
 - ✅ Home hero + rows, See All · 🟡 row styles (poster/wide/Top 10) · ⬜ branches editor (choose content + style, reorder, hide rows), Home page settings
 - ⬜ Collections (imported folder groups as Home rows) · ⬜ Discover page (metadata explore, filters, genres, layouts) · ⬜ Calendar (Trakt/airing)
 - ✅ Search (TMDB + addon catalogs, trending, ranked picks) · ⬜ keyword/torrent search, indexer managers (Prowlarr/Jackett), scraper engines
-- ✅ Title page · ⬜ cast/person pages, OMDb ratings, IMDb credits, parents guide, offline copy of title pages
+- ✅ Title page (logo, age rating, About table: director/creators, writers, stars, studio/network, release, language, votes, budget; episode synopsis, air dates, watched marks) · ⬜ cast/person pages, OMDb/IMDb ratings, parents guide, inline trailer, offline copy of title pages
 - 🟡 Reels (TMDB clips via Cobalt) · ⬜ direct YouTube extraction fallback, HD adaptive
 
 **Sources & playback**
-- ✅ Stremio addons (install, order, enable) · ⬜ addon hub / marketplace, addon auto-update, stream badges, saved source filters, Quick Play rules, source intent everywhere
-- 🟡 Debrid: ✅ Real-Debrid, TorBox · ⬜ AllDebrid, Premiumize, PikPak · ⬜ cloud file browsers per provider, torrent management, bulk add, magnet links
+- ✅ Stremio addons (install, order, enable) · ✅ stream badges (resolution, HDR/DV, codec, source, audio, size, seeders, languages, cached), sort + filters, Play Best Source, source preferences · ⬜ addon hub / marketplace, addon auto-update, imported badge rule packs, Quick Play rules, source intent everywhere
+- 🟡 Debrid: ✅ Real-Debrid, TorBox, AllDebrid · ⬜ Premiumize, PikPak · ⬜ cloud file browsers per provider, torrent management, bulk add, magnet links
 - ✅ System player (PiP, AirPlay, track menus) · ✅ Skip Intro (SkipDB / TheIntroDB / IntroDB) · ✅ Up Next popup with countdown and autoplay · ⬜ MKV/HEVC/DTS engine (MPVKit/VLCKit), external subtitles, subtitle styling/priority, play loader screen, external players settings
 - ⬜ Now Playing / lock screen metadata, media keys
 
