@@ -46,7 +46,8 @@ Generate the Xcode project with `brew install xcodegen && cd apple && xcodegen`,
 | 3 | Trakt/Simkl/MDBList sync: scrobble, history, watchlists, Continue Watching merge (furthest point wins), calendar, `debrify://episode` deep links | |
 | 4 | Downloads: background `URLSession` downloads, season/series scopes, offline library, auto-download filters | |
 | 5 | Cloud browsing: provider file trees, AllDebrid / Premiumize / PikPak, WebDAV, media servers (Plex/Jellyfin/Emby) | |
-| 6 | IPTV (M3U/Xtream/XMLTV EPG), Reels, collections, stream badges, filters/Quick Play rules | |
+| 6 | IPTV (M3U/Xtream/XMLTV EPG) as a **Live** tab with a now/next guide, Reels, collections, stream badges, filters/Quick Play rules | |
+| 6b | Home branches editor (Cedar's "Edit Branch"): choose content (catalog, list, favorites; movies/shows/both) and style (Classic, Critic, Gallery, Landscape, Feature), reorder and hide rows | |
 | 7 | Backup/restore compatible with the Flutter app's export format, WebDAV saved syncs, profiles | |
 | 8 | Polish: Looks (structure + palette), Mac menus/commands, iPad multitasking, accessibility, localisation, release workflow (IPA + SideStore source, DMG) | |
 
@@ -55,10 +56,14 @@ Generate the Xcode project with `brew install xcodegen && cd apple && xcodegen`,
 Reference: Cedar (cedartv.github.io/cedar-tv-updates), native Liquid Glass.
 
 - Near-black ground (#08090B) so artwork carries the colour; Nextup violet as tint.
-- Home: a full-bleed paging hero that runs under the glass chrome (`backgroundExtensionEffect`),
-  then rows ("branches") in three styles: poster, wide (landscape backdrop) and Top 10.
-- Title page: full-bleed artwork with the title over it, glass action buttons, season chips,
-  episodes as a list on iPhone and an episode rail on iPad/Mac.
+- Home: a full-bleed paging hero under the glass chrome (`backgroundExtensionEffect`) with a
+  centered title, facts and a More chip; then rows ("branches") whose header opens the full list,
+  in poster, wide (landscape) and Top 10 styles.
+- Title page: full-bleed artwork, centered title/facts/synopsis, a white Resume capsule with round
+  glass Random / Favorite / Watchlist buttons (capsules with labels on Mac), a Season menu and an
+  episode rail on every device. A ⋯ menu holds Share, IMDb and Trailer.
+- Tabs: floating glass tab bar on iPhone (Home, Library, Search), toolbar tabs on the Mac.
+  Settings sits behind a glass gear button (the Settings window on the Mac).
 - Search opens on trending rows and a ranked "What Should I Watch" list before you type.
 - System chrome only: adaptable `TabView` (floating glass tab bar on iPhone, sidebar on iPad/Mac),
   search tab role, glass / glassProminent buttons, `GlassEffectContainer` for grouped controls.

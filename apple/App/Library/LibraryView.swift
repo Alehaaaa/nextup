@@ -30,6 +30,25 @@ struct LibraryView: View {
                     }
                 }
 
+                if !model.watchlist.isEmpty {
+                    PosterRail(title: "Watchlist", items: model.watchlist) { item in
+                        NavigationLink(value: item) { PosterCard(item: item) }.buttonStyle(.plain)
+                            .contextMenu {
+                                Button("Remove from Watchlist", systemImage: "bookmark.slash") { model.toggleWatchlist(item) }
+                            }
+                    }
+                    .padding(.horizontal, -Theme.gutter)
+                }
+                if !model.favorites.isEmpty {
+                    PosterRail(title: "Favorites", items: model.favorites) { item in
+                        NavigationLink(value: item) { PosterCard(item: item) }.buttonStyle(.plain)
+                            .contextMenu {
+                                Button("Remove from Favorites", systemImage: "heart.slash") { model.toggleFavorite(item) }
+                            }
+                    }
+                    .padding(.horizontal, -Theme.gutter)
+                }
+
                 if model.trakt.isSignedIn {
                     section("Paused on Trakt") {
                         if traktPlayback.isEmpty {
@@ -65,6 +84,7 @@ struct LibraryView: View {
         }
         .nextupBackground()
         .navigationTitle("Library")
+        .toolbar { SettingsToolbarItem() }
         .refreshable { await loadTrakt() }
         .task(id: model.accountsRevision) { await loadTrakt() }
     }

@@ -42,18 +42,29 @@ struct RootView: View {
             Tab(AppSection.library.title, systemImage: AppSection.library.symbol, value: AppSection.library) {
                 SectionStack(section: .library)
             }
-            #if !os(macOS)
-            // On the Mac, Settings lives in its own window (⌘,) like every Mac app.
-            Tab(AppSection.settings.title, systemImage: AppSection.settings.symbol, value: AppSection.settings) {
-                SectionStack(section: .settings)
-            }
-            #endif
             Tab(value: AppSection.search, role: .search) {
                 SectionStack(section: .search)
             }
         }
+        #if os(macOS)
+        // Mac: the tabs sit in the toolbar as a glass segmented control.
+        .tabViewStyle(.automatic)
+        #else
+        // iPhone: floating glass tab bar. iPad: tab bar that can turn into a sidebar.
         .tabViewStyle(.sidebarAdaptable)
         .tabBarMinimizeBehavior(.onScrollDown)
+        .sheet(isPresented: Binding(get: { model.showingSettings }, set: { model.showingSettings = $0 })) {
+            NavigationStack {
+                SettingsView()
+                    .toolbar {
+                        ToolbarItem(placement: .confirmationAction) {
+                            Button("Done") { model.showingSettings = false }
+                        }
+                    }
+            }
+            .environment(model)
+        }
+        #endif
         .environment(\.play, playAction)
         #if os(macOS)
         .focusedSceneValue(\.sectionSelection, $selection)
@@ -91,6 +102,26 @@ struct SectionStack: View {
             .navigationDestination(for: MediaItem.self) { item in
                 TitleDetailView(item: item)
             }
+            .navigationDestination(for: MediaRail.self) { rail in
+                SeeAllView(rail: rail)
+            }
+        }
+    }
+}
+
+/// The glass gear in the top corner. Settings is a sheet on iPhone/iPad and the Settings window on the Mac.
+struct SettingsToolbarItem: ToolbarContent {
+    @Environment(AppModel.self) private var model
+
+    var body: some ToolbarContent {
+        ToolbarItem(placement: .primaryAction) {
+            #if os(macOS)
+            SettingsLink { Image(systemName: "gearshape") }
+                .help("Settings")
+            #else
+            Button { model.showingSettings = true } label: { Image(systemName: "gearshape") }
+                .accessibilityLabel("Settings")
+            #endif
         }
     }
 }

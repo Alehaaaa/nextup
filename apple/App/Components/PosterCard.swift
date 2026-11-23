@@ -69,7 +69,7 @@ struct PosterCard: View {
                 }
                 .modifier(CardShape())
             VStack(alignment: .leading, spacing: 2) {
-                Text(item.title).font(.footnote.weight(.semibold)).lineLimit(1)
+                Text(item.title).font(.subheadline).lineLimit(1)
                 if let caption { Text(caption).font(.caption2).foregroundStyle(.secondary).lineLimit(1) }
             }
         }
@@ -138,13 +138,27 @@ struct Top10Card: View {
 struct PosterRail<Item: Identifiable, Card: View>: View {
     let title: String
     let items: [Item]
+    /// When set, the header becomes a link to the whole list ("Movie night ›").
+    var seeAll: MediaRail? = nil
     @ViewBuilder var card: (Item) -> Card
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text(title)
-                .font(.title3.weight(.bold))
-                .padding(.horizontal, Theme.gutter)
+            Group {
+                if let seeAll {
+                    NavigationLink(value: seeAll) {
+                        HStack(spacing: 6) {
+                            Text(title)
+                            Image(systemName: "chevron.right").font(.subheadline.weight(.bold)).foregroundStyle(.secondary)
+                        }
+                    }
+                    .buttonStyle(.plain)
+                } else {
+                    Text(title)
+                }
+            }
+            .font(.title3.weight(.bold))
+            .padding(.horizontal, Theme.gutter)
             ScrollView(.horizontal, showsIndicators: false) {
                 LazyHStack(alignment: .top, spacing: 14) {
                     ForEach(items) { item in card(item) }
@@ -172,5 +186,31 @@ struct TitleContextMenu: View {
         if let onRemove {
             Button(role: .destructive, action: onRemove) { Label("Remove from Continue Watching", systemImage: "xmark.circle") }
         }
+    }
+}
+
+/// Every title in a row, as a grid.
+struct SeeAllView: View {
+    let rail: MediaRail
+
+    private var columns: [GridItem] {
+        [GridItem(.adaptive(minimum: Theme.railPosterWidth, maximum: Theme.railPosterWidth + 40), spacing: 16)]
+    }
+
+    var body: some View {
+        ScrollView {
+            LazyVGrid(columns: columns, alignment: .leading, spacing: 22) {
+                ForEach(rail.items) { item in
+                    NavigationLink(value: item) { PosterCard(item: item) }
+                        .buttonStyle(.plain)
+                        .contextMenu { TitleContextMenu(item: item) }
+                }
+            }
+            .padding(.horizontal, Theme.gutter)
+            .padding(.vertical)
+        }
+        .nextupBackground()
+        .navigationTitle(rail.title)
+        .inlineTitle()
     }
 }

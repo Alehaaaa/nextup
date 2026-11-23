@@ -53,7 +53,8 @@ struct HomeView: View {
         .overlay { if isLoading && rails.isEmpty { ProgressView().controlSize(.large) } }
         .nextupBackground()
         .navigationTitle("Home")
-        .inlineTitle()
+        .toolbar(removing: .title)
+        .toolbar { SettingsToolbarItem() }
         .refreshable { await load() }
         .task(id: "\(model.accountsRevision)-\(model.addons.count)") { await load() }
     }
@@ -62,13 +63,13 @@ struct HomeView: View {
     private func rail(_ row: HomeRail) -> some View {
         switch row.style {
         case .poster:
-            PosterRail(title: row.rail.title, items: row.rail.items) { item in
+            PosterRail(title: row.rail.title, items: row.rail.items, seeAll: row.rail) { item in
                 NavigationLink(value: item) { PosterCard(item: item) }
                     .buttonStyle(.plain)
                     .contextMenu { TitleContextMenu(item: item) }
             }
         case .wide:
-            PosterRail(title: row.rail.title, items: row.rail.items) { item in
+            PosterRail(title: row.rail.title, items: row.rail.items, seeAll: row.rail) { item in
                 NavigationLink(value: item) {
                     WideCard(item: item, caption: [item.year.map(String.init), item.rating.map { String(format: "★ %.1f", $0) }]
                         .compactMap { $0 }.joined(separator: " · "))
@@ -200,66 +201,79 @@ private struct HeroCarousel: View {
 
 private struct HeroPage: View {
     let item: MediaItem
+    @Environment(\.isCompactWidth) private var isCompact
 
     static var height: CGFloat {
         #if os(macOS)
-        return 520
+        return 560
         #else
-        return UIDevice.current.userInterfaceIdiom == .pad ? 560 : 520
+        return UIDevice.current.userInterfaceIdiom == .pad ? 620 : 600
         #endif
     }
 
     var body: some View {
-        ZStack(alignment: .bottomLeading) {
-            ArtworkImage(url: item.backdropURL)
-                .frame(maxWidth: .infinity)
-                .frame(height: Self.height)
-                .clipped()
-                .backgroundExtensionEffect()
-            LinearGradient(stops: [
-                .init(color: .clear, location: 0.35),
-                .init(color: Theme.background.opacity(0.7), location: 0.75),
-                .init(color: Theme.background, location: 1),
-            ], startPoint: .top, endPoint: .bottom)
-            VStack(alignment: .leading, spacing: 10) {
-                Text(item.kind == .movie ? "MOVIE" : "SERIES")
-                    .font(.caption.weight(.bold)).tracking(1.5)
-                    .foregroundStyle(.white.opacity(0.7))
-                Text(item.title)
-                    .font(.system(size: 38, weight: .heavy))
-                    .lineLimit(2)
-                    .minimumScaleFactor(0.7)
-                HStack(spacing: 10) {
-                    if let year = item.year { Text(String(year)) }
-                    if let rating = item.rating { Label(String(format: "%.1f", rating), systemImage: "star.fill") }
-                }
-                .font(.subheadline.weight(.medium))
-                .foregroundStyle(.white.opacity(0.8))
-                if !item.overview.isEmpty {
-                    Text(item.overview)
-                        .font(.callout)
-                        .foregroundStyle(.white.opacity(0.75))
-                        .lineLimit(3)
-                        .frame(maxWidth: 560, alignment: .leading)
-                }
-                GlassEffectContainer(spacing: 12) {
-                    HStack(spacing: 12) {
-                        NavigationLink(value: item) {
-                            Label("Watch", systemImage: "play.fill").padding(.horizontal, 6)
+        NavigationLink(value: item) {
+            ZStack(alignment: .bottom) {
+                ArtworkImage(url: item.backdropURL)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: Self.height)
+                    .clipped()
+                    .backgroundExtensionEffect()
+                LinearGradient(stops: [
+                    .init(color: .clear, location: 0.4),
+                    .init(color: Theme.background.opacity(0.65), location: 0.78),
+                    .init(color: Theme.background, location: 1),
+                ], startPoint: .top, endPoint: .bottom)
+                // Centered, title-card style, like a TV app's featured slot.
+                VStack(spacing: 12) {
+                    Text(item.title)
+                        .font(.system(size: isCompact ? 34 : 52, weight: .regular, design: .serif))
+                        .tracking(isCompact ? 2 : 4)
+                        .textCase(.uppercase)
+                        .multilineTextAlignment(.center)
+                        .lineLimit(2)
+                        .minimumScaleFactor(0.6)
+                        .shadow(color: .black.opacity(0.5), radius: 12)
+                    HeroFacts(item: item)
+                    if !item.overview.isEmpty {
+                        HStack(alignment: .lastTextBaseline, spacing: 8) {
+                            Text(item.overview)
+                                .font(.subheadline)
+                                .foregroundStyle(.white.opacity(0.7))
+                                .lineLimit(2)
+                                .multilineTextAlignment(isCompact ? .leading : .center)
+                            if isCompact {
+                                Text("More")
+                                    .font(.subheadline.weight(.semibold))
+                                    .padding(.horizontal, 12).padding(.vertical, 5)
+                                    .glassEffect(.regular, in: Capsule())
+                            }
                         }
-                        .buttonStyle(.glassProminent)
-                        NavigationLink(value: item) {
-                            Label("Details", systemImage: "info.circle")
-                        }
-                        .buttonStyle(.glass)
+                        .frame(maxWidth: 720)
                     }
-                    .controlSize(.large)
                 }
-                .padding(.top, 4)
+                .padding(.horizontal, Theme.gutter)
+                .padding(.bottom, 44)
             }
-            .padding(.horizontal, Theme.gutter)
-            .padding(.bottom, 40)
         }
+        .buttonStyle(.plain)
+    }
+}
+
+private struct HeroFacts: View {
+    let item: MediaItem
+
+    var body: some View {
+        HStack(spacing: 8) {
+            if let year = item.year { Text(String(year)) }
+            if item.year != nil, item.rating != nil { Text("·").foregroundStyle(.secondary) }
+            if let rating = item.rating { Label(String(format: "%.1f", rating), systemImage: "star.fill").labelStyle(.titleAndIcon) }
+            Text(item.kind == .movie ? "Movie" : "Series")
+                .padding(.horizontal, 10).padding(.vertical, 3)
+                .glassEffect(.regular, in: Capsule())
+        }
+        .font(.subheadline.weight(.medium))
+        .foregroundStyle(.white.opacity(0.9))
     }
 }
 

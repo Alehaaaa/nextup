@@ -42,7 +42,13 @@ struct SearchView: View {
         .overlay(alignment: .top) { if isSearching { ProgressView().padding() } }
         .nextupBackground()
         .navigationTitle("Search")
-        .searchable(text: $query, prompt: "Movies, shows")
+        .inlineTitle()
+        .toolbar { SettingsToolbarItem() }
+        #if os(iOS)
+        .searchable(text: $query, placement: .navigationBarDrawer(displayMode: .always), prompt: "Search Nextup")
+        #else
+        .searchable(text: $query, placement: .toolbar, prompt: "Search Nextup")
+        #endif
         .task { await loadDiscover() }
         .task(id: query) {
             // Debounce typing.

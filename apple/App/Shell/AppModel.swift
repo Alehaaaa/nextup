@@ -16,6 +16,12 @@ final class AppModel {
     var preferredDebrid: DebridService? {
         didSet { defaults.defaults.set(preferredDebrid?.rawValue, forKey: Keys.preferredDebrid) }
     }
+    /// Saved on this device; shown in Library.
+    var favorites: [MediaItem] { didSet { defaults.save(favorites, key: Keys.favorites) } }
+    var watchlist: [MediaItem] { didSet { defaults.save(watchlist, key: Keys.watchlist) } }
+    /// iPhone/iPad open Settings as a sheet from the gear button; the Mac uses its Settings window.
+    var showingSettings = false
+
     /// Bumped when Continue Watching changes so rails reload.
     private(set) var progressRevision = 0
     /// Bumped when an account or token changes.
@@ -30,6 +36,8 @@ final class AppModel {
         self.progress = WatchProgressStore(store: defaults)
         self.trakt = TraktClient(secrets: secrets)
         self.addons = defaults.load([InstalledAddon].self, key: Keys.addons) ?? []
+        self.favorites = defaults.load([MediaItem].self, key: Keys.favorites) ?? []
+        self.watchlist = defaults.load([MediaItem].self, key: Keys.watchlist) ?? []
         self.preferredDebrid = defaults.defaults.string(forKey: Keys.preferredDebrid).flatMap(DebridService.init(rawValue:))
         seedBuildTimeTMDBToken()
     }
@@ -37,6 +45,8 @@ final class AppModel {
     enum Keys {
         static let addons = "nextup.addons.v1"
         static let preferredDebrid = "nextup.preferredDebrid"
+        static let favorites = "nextup.favorites.v1"
+        static let watchlist = "nextup.watchlist.v1"
     }
 
     // MARK: Metadata
@@ -96,6 +106,19 @@ final class AppModel {
 
     func moveAddons(from source: IndexSet, to destination: Int) {
         addons.move(fromOffsets: source, toOffset: destination)
+    }
+
+    // MARK: Favorites and watchlist
+
+    func isFavorite(_ item: MediaItem) -> Bool { favorites.contains { $0.id == item.id } }
+    func isOnWatchlist(_ item: MediaItem) -> Bool { watchlist.contains { $0.id == item.id } }
+
+    func toggleFavorite(_ item: MediaItem) {
+        if isFavorite(item) { favorites.removeAll { $0.id == item.id } } else { favorites.insert(item, at: 0) }
+    }
+
+    func toggleWatchlist(_ item: MediaItem) {
+        if isOnWatchlist(item) { watchlist.removeAll { $0.id == item.id } } else { watchlist.insert(item, at: 0) }
     }
 
     // MARK: Progress

@@ -41,9 +41,9 @@ enum Theme {
 
     @MainActor static var railPosterWidth: CGFloat {
         #if os(macOS)
-        return 150
+        return 184
         #else
-        return UIDevice.current.userInterfaceIdiom == .pad ? 150 : 118
+        return UIDevice.current.userInterfaceIdiom == .pad ? 170 : 118
         #endif
     }
 }

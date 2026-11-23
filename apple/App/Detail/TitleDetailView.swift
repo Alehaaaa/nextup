@@ -28,10 +28,6 @@ struct TitleDetailView: View {
                 if let error {
                     Label(error, systemImage: "exclamationmark.triangle").foregroundStyle(.secondary).padding(.horizontal, Theme.gutter)
                 }
-                if !item.overview.isEmpty {
-                    Text(item.overview).font(.body).foregroundStyle(.white.opacity(0.78)).padding(.horizontal, Theme.gutter)
-                        .frame(maxWidth: 820, alignment: .leading)
-                }
                 if item.kind == .series { episodesSection }
                 if let cast = detail?.cast, !cast.isEmpty { castRail(cast) }
                 if let similar = detail?.similar, !similar.isEmpty {
@@ -47,6 +43,12 @@ struct TitleDetailView: View {
         .nextupBackground()
         .navigationTitle(item.title)
         .inlineTitle()
+        #if os(iOS)
+        .toolbar(removing: .title)
+        #endif
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) { moreMenu }
+        }
         .task { await load() }
         .sheet(item: $sourceTarget, onDismiss: startPendingPlayback) { target in
             SourcesView(target: target) { pendingPlayback = $0 }
@@ -56,11 +58,11 @@ struct TitleDetailView: View {
 
     // MARK: Sections
 
-    private var headerHeight: CGFloat { isCompact ? 480 : 560 }
+    private var headerHeight: CGFloat { isCompact ? 560 : 520 }
 
-    /// Full-bleed artwork that runs under the glass toolbar, with the title set over it.
+    /// Full-bleed artwork under the glass toolbar; title, facts and synopsis centered over it.
     private var header: some View {
-        ZStack(alignment: .bottomLeading) {
+        ZStack(alignment: .bottom) {
             ArtworkImage(url: item.backdropURL ?? item.posterURL)
                 .frame(maxWidth: .infinity)
                 .frame(height: headerHeight)
@@ -68,32 +70,58 @@ struct TitleDetailView: View {
                 .backgroundExtensionEffect()
             LinearGradient(stops: [
                 .init(color: .clear, location: 0.3),
-                .init(color: Theme.background.opacity(0.75), location: 0.75),
+                .init(color: Theme.background.opacity(0.7), location: 0.72),
                 .init(color: Theme.background, location: 1),
             ], startPoint: .top, endPoint: .bottom)
-            VStack(alignment: .leading, spacing: 8) {
+            VStack(spacing: 10) {
                 Text(item.title)
-                    .font(.system(size: isCompact ? 34 : 46, weight: .heavy))
-                    .lineLimit(2)
+                    .font(.system(size: isCompact ? 34 : 30, weight: .bold))
+                    .multilineTextAlignment(.center)
+                    .lineLimit(3)
                     .minimumScaleFactor(0.7)
-                if let tagline = detail?.tagline {
-                    Text(tagline).font(.callout).italic().foregroundStyle(.white.opacity(0.75))
-                }
                 if !facts.isEmpty {
-                    Text(facts).font(.subheadline.weight(.medium)).foregroundStyle(.white.opacity(0.75))
+                    Text(facts).font(.subheadline.weight(.medium)).foregroundStyle(.white.opacity(0.85))
+                }
+                if !item.overview.isEmpty {
+                    Text(item.overview)
+                        .font(.subheadline)
+                        .foregroundStyle(.white.opacity(0.55))
+                        .multilineTextAlignment(.center)
+                        .lineLimit(isCompact ? 3 : 2)
+                        .frame(maxWidth: 720)
                 }
             }
             .padding(.horizontal, Theme.gutter)
-            .padding(.bottom, 8)
+            .padding(.bottom, 12)
         }
+    }
+
+    private var moreMenu: some View {
+        Menu {
+            if let imdb = item.imdbID, let url = URL(string: "https://www.imdb.com/title/\(imdb)/") {
+                ShareLink(item: url) { Label("Share", systemImage: "square.and.arrow.up") }
+                Link(destination: url) { Label("Open on IMDb", systemImage: "safari") }
+            }
+            if let key = detail?.trailerYouTubeKey, let url = URL(string: "https://www.youtube.com/watch?v=\(key)") {
+                Link(destination: url) { Label("Watch Trailer", systemImage: "film") }
+            }
+            if resumeEntry != nil {
+                Button(role: .destructive) { model.removeFromContinueWatching(item.id) } label: {
+                    Label("Remove from Continue Watching", systemImage: "xmark.circle")
+                }
+            }
+        } label: {
+            Image(systemName: "ellipsis")
+        }
+        .accessibilityLabel("More")
     }
 
     private var facts: String {
         var parts: [String] = []
         if let year = item.year { parts.append(String(year)) }
         if let runtime = Format.runtime(detail?.runtimeMinutes) { parts.append(runtime) }
+        if let genres = detail?.genres, !genres.isEmpty { parts.append(genres.prefix(2).joined(separator: ", ")) }
         if let rating = item.rating { parts.append(String(format: "★ %.1f", rating)) }
-        if let genres = detail?.genres, !genres.isEmpty { parts.append(genres.prefix(3).joined(separator: ", ")) }
         return parts.joined(separator: " · ")
     }
 
@@ -101,40 +129,64 @@ struct TitleDetailView: View {
         model.continueWatching().first { $0.id == item.id }
     }
 
+    /// iPhone: a wide white Resume button and round glass buttons. Mac/iPad: a centered row of capsules.
     private var actions: some View {
-        GlassEffectContainer(spacing: 12) {
-            HStack(spacing: 12) {
-                Button {
-                    playPrimary()
-                } label: {
-                    Label(primaryLabel, systemImage: "play.fill")
-                        .frame(minWidth: isCompact ? nil : 160)
-                        .frame(maxWidth: isCompact ? .infinity : nil)
+        GlassEffectContainer(spacing: 10) {
+            HStack(spacing: 10) {
+                Button { playPrimary() } label: {
+                    HStack(spacing: 8) {
+                        Image(systemName: "play.fill")
+                        Text(primaryLabel.title).fontWeight(.semibold)
+                        if let code = primaryLabel.code { Text(code).foregroundStyle(.black.opacity(0.45)) }
+                    }
+                    .frame(maxWidth: isCompact ? .infinity : nil)
                 }
-                .buttonStyle(.glassProminent)
+                .buttonStyle(PrimaryCapsuleStyle(large: isCompact))
                 .disabled(item.imdbID == nil)
 
-                if let key = detail?.trailerYouTubeKey, let url = URL(string: "https://www.youtube.com/watch?v=\(key)") {
-                    Link(destination: url) { Image(systemName: "film") }
-                        .buttonStyle(.glass)
-                        .accessibilityLabel("Trailer")
+                if item.kind == .series {
+                    actionButton("Random", symbol: "dice", active: false) { playRandom() }
+                        .disabled(episodes.isEmpty)
                 }
-                if let imdb = item.imdbID, let url = URL(string: "https://www.imdb.com/title/\(imdb)/") {
-                    ShareLink(item: url) { Image(systemName: "square.and.arrow.up") }
-                        .buttonStyle(.glass)
-                        .accessibilityLabel("Share")
+                actionButton("Favorite", symbol: model.isFavorite(item) ? "heart.fill" : "heart", active: model.isFavorite(item)) {
+                    model.toggleFavorite(item)
+                }
+                actionButton("Watchlist", symbol: model.isOnWatchlist(item) ? "bookmark.fill" : "bookmark", active: model.isOnWatchlist(item)) {
+                    model.toggleWatchlist(item)
                 }
             }
-            .controlSize(.large)
+        }
+        .frame(maxWidth: .infinity, alignment: .center)
+    }
+
+    @ViewBuilder
+    private func actionButton(_ title: String, symbol: String, active: Bool, action: @escaping () -> Void) -> some View {
+        if isCompact {
+            Button(action: action) {
+                Image(systemName: symbol).font(.title3).frame(width: 52, height: 52)
+            }
+            .buttonStyle(.plain)
+            .glassEffect(.regular.interactive(), in: Circle())
+            .accessibilityLabel(title)
+        } else {
+            Button(action: action) { Label(title, systemImage: symbol) }
+                .buttonStyle(.glass)
         }
     }
 
-    private var primaryLabel: String {
-        guard let entry = resumeEntry else { return item.kind == .series ? "Play S1E1" : "Play" }
-        if let s = entry.season, let e = entry.episode {
-            return entry.isFinished ? "Next: S\(s)E\(e + 1)" : "Resume S\(s)E\(e)"
+    private func playRandom() {
+        guard let episode = episodes.randomElement() else { return }
+        openSources(for: episode)
+    }
+
+    private var primaryLabel: (title: String, code: String?) {
+        guard let entry = resumeEntry else {
+            return item.kind == .series ? ("Play", "S01E01") : ("Play", nil)
         }
-        return "Resume"
+        if let s = entry.season, let e = entry.episode {
+            return entry.isFinished ? ("Next", String(format: "S%02dE%02d", s, e + 1)) : ("Resume", String(format: "S%02dE%02d", s, e))
+        }
+        return ("Resume", nil)
     }
 
     private func playPrimary() {
@@ -157,45 +209,20 @@ struct TitleDetailView: View {
         return Array(Set(addonEpisodes.map(\.season))).sorted()
     }
 
-    /// Season chips, then episodes: a list on iPhone, an episode rail on iPad and Mac.
+    /// Season menu, then an episode rail (the same on iPhone, iPad and Mac).
     @ViewBuilder
     private var episodesSection: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            Text("Episodes").font(.title3.weight(.bold)).padding(.horizontal, Theme.gutter)
-
-            if seasonNumbers.count > 1 {
-                ScrollView(.horizontal, showsIndicators: false) {
-                    GlassEffectContainer(spacing: 8) {
-                        HStack(spacing: 8) {
-                            ForEach(seasonNumbers, id: \.self) { number in
-                                Button("Season \(number)") { season = number }
-                                    .buttonStyle(SeasonChipStyle(selected: number == season))
-                            }
-                        }
-                    }
-                    .padding(.horizontal, Theme.gutter)
-                }
-                .scrollClipDisabled()
-            }
+        VStack(alignment: .leading, spacing: 12) {
+            seasonMenu.padding(.horizontal, Theme.gutter)
 
             if loadingEpisodes {
-                ProgressView().frame(maxWidth: .infinity)
-            } else if isCompact {
-                LazyVStack(spacing: 12) {
-                    ForEach(episodes) { episode in
-                        Button { openSources(for: episode) } label: {
-                            EpisodeRow(episode: episode, progress: progress(for: episode))
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-                .padding(.horizontal, Theme.gutter)
+                ProgressView().frame(maxWidth: .infinity, minHeight: 120)
             } else {
                 ScrollView(.horizontal, showsIndicators: false) {
-                    LazyHStack(alignment: .top, spacing: 16) {
+                    LazyHStack(alignment: .top, spacing: 14) {
                         ForEach(episodes) { episode in
                             Button { openSources(for: episode) } label: {
-                                EpisodeCard(episode: episode, progress: progress(for: episode))
+                                EpisodeCard(episode: episode, progress: progress(for: episode), width: isCompact ? 250 : 340)
                             }
                             .buttonStyle(.plain)
                         }
@@ -208,6 +235,30 @@ struct TitleDetailView: View {
             }
         }
         .task(id: season) { await loadEpisodes() }
+    }
+
+    @ViewBuilder
+    private var seasonMenu: some View {
+        let title = HStack(spacing: 6) {
+            Text("Season \(season)")
+            Image(systemName: "chevron.up.chevron.down").font(.caption.weight(.bold)).foregroundStyle(.secondary)
+        }
+        .font(isCompact ? .title3.weight(.bold) : .subheadline.weight(.semibold))
+
+        if seasonNumbers.count > 1 {
+            Menu {
+                Picker("Season", selection: $season) {
+                    ForEach(seasonNumbers, id: \.self) { Text("Season \($0)").tag($0) }
+                }
+            } label: {
+                if isCompact { title } else { title.padding(.horizontal, 14).padding(.vertical, 7).glassEffect(.regular, in: Capsule()) }
+            }
+            .menuStyle(.button)
+            .buttonStyle(.plain)
+            .fixedSize()
+        } else {
+            Text("Season \(season)").font(isCompact ? .title3.weight(.bold) : .subheadline.weight(.semibold))
+        }
     }
 
     private func openSources(for episode: Episode) {
@@ -293,79 +344,54 @@ struct TitleDetailView: View {
     }
 }
 
-private struct SeasonChipStyle: ButtonStyle {
-    let selected: Bool
+/// The white capsule used for Resume / Play.
+private struct PrimaryCapsuleStyle: ButtonStyle {
+    let large: Bool
+    @Environment(\.isEnabled) private var isEnabled
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .font(.subheadline.weight(.semibold))
-            .padding(.horizontal, 16).padding(.vertical, 9)
-            .foregroundStyle(selected ? .black : .white)
-            .glassEffect(selected ? .regular.tint(.white).interactive() : .regular.interactive(), in: Capsule())
-            .scaleEffect(configuration.isPressed ? 0.96 : 1)
+            .font(large ? .title3 : .subheadline)
+            .foregroundStyle(.black)
+            .padding(.horizontal, large ? 24 : 16)
+            .frame(height: large ? 52 : 32)
+            .background(.white.opacity(isEnabled ? 1 : 0.5), in: Capsule())
+            .scaleEffect(configuration.isPressed ? 0.97 : 1)
             .animation(.snappy, value: configuration.isPressed)
     }
 }
 
-private struct EpisodeThumb: View {
+/// A landscape card in the episode rail: still, progress, "E1 • Title", runtime.
+private struct EpisodeCard: View {
     let episode: Episode
     var progress: Double?
     var width: CGFloat
 
     var body: some View {
-        ArtworkImage(url: episode.stillURL)
-            .frame(width: width, height: width * 9 / 16)
-            .overlay(alignment: .bottom) {
-                if let progress, progress > 0 {
-                    ProgressView(value: progress).tint(.white).padding(8)
+        VStack(alignment: .leading, spacing: 6) {
+            ArtworkImage(url: episode.stillURL)
+                .frame(width: width, height: width * 9 / 16)
+                .overlay(alignment: .bottom) {
+                    if let progress, progress > 0 {
+                        GeometryReader { geo in
+                            ZStack(alignment: .leading) {
+                                Capsule().fill(.white.opacity(0.3))
+                                Capsule().fill(Theme.accent).frame(width: max(4, geo.size.width * progress))
+                            }
+                        }
+                        .frame(height: 4)
+                        .padding(.horizontal, 10).padding(.bottom, 10)
+                    }
                 }
+                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+            (Text("E\(episode.number)  •  ").foregroundStyle(.secondary) + Text(episode.title).fontWeight(.semibold))
+                .font(.subheadline)
+                .lineLimit(1)
+            if let runtime = Format.runtime(episode.runtimeMinutes) {
+                Text(runtime).font(.caption).foregroundStyle(.secondary)
             }
-            .overlay {
-                Image(systemName: "play.fill")
-                    .font(.headline)
-                    .padding(12)
-                    .glassEffect(.regular, in: Circle())
-            }
-            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-    }
-}
-
-/// iPhone: one episode per row.
-private struct EpisodeRow: View {
-    let episode: Episode
-    var progress: Double?
-
-    var body: some View {
-        HStack(alignment: .top, spacing: 12) {
-            EpisodeThumb(episode: episode, progress: progress, width: 150)
-            VStack(alignment: .leading, spacing: 4) {
-                Text("\(episode.number). \(episode.title)").font(.subheadline.weight(.semibold)).lineLimit(2)
-                if let runtime = Format.runtime(episode.runtimeMinutes) {
-                    Text(runtime).font(.caption).foregroundStyle(.secondary)
-                }
-                if !episode.overview.isEmpty {
-                    Text(episode.overview).font(.caption).foregroundStyle(.secondary).lineLimit(3)
-                }
-            }
-            Spacer(minLength: 0)
         }
-        .contentShape(Rectangle())
-    }
-}
-
-/// iPad and Mac: a landscape card in the episode rail.
-private struct EpisodeCard: View {
-    let episode: Episode
-    var progress: Double?
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            EpisodeThumb(episode: episode, progress: progress, width: 300)
-            Text("\(episode.number). \(episode.title)").font(.subheadline.weight(.semibold)).lineLimit(1)
-            Text(episode.overview.isEmpty ? (Format.runtime(episode.runtimeMinutes) ?? " ") : episode.overview)
-                .font(.caption).foregroundStyle(.secondary).lineLimit(2)
-        }
-        .frame(width: 300, alignment: .leading)
+        .frame(width: width, alignment: .leading)
         .contentShape(Rectangle())
     }
 }
