@@ -3,7 +3,7 @@
   "identifier": "io.github.alehaaaa.nextup.native.commits",
   "subtitle": "The native SwiftUI Nextup for iPhone and iPad, built from every commit.",
   "description": "Nextup is an independent, unofficial fork of Debrify with a Reels feed, Continue Watching synced across Trakt, Simkl and MDBList, offline-first downloads and a reworked glass interface.\n\nEvery commit to swift in Alehaaaa/nextup is built automatically and published here with a changelog of what changed since the previous build, so updates show up right in SideStore or AltStore. The source keeps the last few builds, so you can always roll back.\n\nNot affiliated with or endorsed by the official Debrify project.",
-  "iconURL": "https://raw.githubusercontent.com/Alehaaaa/nextup/d3363426d92517424bd1f180852692f23d2b3cf7/assets/icon/app_icon_flat.png",
+  "iconURL": "https://raw.githubusercontent.com/Alehaaaa/nextup/c089bda86eb7fbb98852f836d90db429a262e462/assets/icon/app_icon_flat.png",
   "website": "https://github.com/Alehaaaa/nextup",
   "tintColor": "#7C4DFF",
   "featuredApps": [
@@ -16,11 +16,20 @@
       "developerName": "Alehaaaa",
       "subtitle": "Native beta of Nextup for iPhone and iPad.",
       "localizedDescription": "A native SwiftUI rebuild of Nextup, shared with the Mac app. It is in early development and does not yet have every feature of the main app.\n\n• TMDB home rows, search and title pages\n• Stremio addons for catalogs and streams\n• Real-Debrid and TorBox playback\n• Trakt sign-in, scrobbling, paused items and watchlist\n• Continue Watching on this device\n\nNextup doesn't host or provide any content; you connect the services you already use.\n\nThese are untested builds of every commit, made by GitHub Actions. SideStore or AltStore re-signs them with your own certificate on install. Nextup is an independent fork of Debrify and isn't affiliated with the official project.",
-      "iconURL": "https://raw.githubusercontent.com/Alehaaaa/nextup/d3363426d92517424bd1f180852692f23d2b3cf7/assets/icon/app_icon_flat.png",
+      "iconURL": "https://raw.githubusercontent.com/Alehaaaa/nextup/c089bda86eb7fbb98852f836d90db429a262e462/assets/icon/app_icon_flat.png",
       "tintColor": "#7C4DFF",
       "category": "entertainment",
       "screenshots": {},
       "versions": [
+        {
+          "version": "0.1.0",
+          "buildVersion": "202611231143",
+          "date": "2026-11-23T11:45:28Z",
+          "localizedDescription": "What's new:\n• AllDebrid, richer title page and sources, playback and Home options (c089bda8)\n\nBuild 202611231143 from swift@c089bda\nhttps://github.com/Alehaaaa/nextup/compare/d336342...c089bda",
+          "downloadURL": "https://github.com/Alehaaaa/nextup/releases/download/native-build-11-c089bda/nextup-native-ios-11-c089bda.ipa",
+          "size": 2504536,
+          "minOSVersion": "26.0"
+        },
         {
           "version": "0.1.0",
           "buildVersion": "202611231118",
