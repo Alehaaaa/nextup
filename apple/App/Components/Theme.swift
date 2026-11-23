@@ -19,7 +19,7 @@ enum Theme {
     static let corner: CGFloat = 10
 
     /// Poster width for rails, sized per platform so iPhone, iPad and Mac all show a sensible count.
-    static var railPosterWidth: CGFloat {
+    @MainActor static var railPosterWidth: CGFloat {
         #if os(macOS)
         return 150
         #else
@@ -68,6 +68,7 @@ enum Format {
     }
 }
 
+@MainActor
 enum Clipboard {
     static func copy(_ string: String) {
         #if os(macOS)

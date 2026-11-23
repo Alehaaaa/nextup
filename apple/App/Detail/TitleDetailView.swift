@@ -44,7 +44,7 @@ struct TitleDetailView: View {
         .nextupBackground()
         .navigationTitle(item.title)
         .inlineTitle()
-        .task(id: item.id) { await load() }
+        .task { await load() }
         .sheet(item: $sourceTarget, onDismiss: startPendingPlayback) { target in
             SourcesView(target: target) { pendingPlayback = $0 }
                 .environment(model)
@@ -205,7 +205,7 @@ struct TitleDetailView: View {
     private func startPendingPlayback() {
         guard let request = pendingPlayback else { return }
         pendingPlayback = nil
-        play?(request)
+        play?.callAsFunction(request)
     }
 
     // MARK: Loading

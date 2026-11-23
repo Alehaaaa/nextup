@@ -7,7 +7,7 @@ struct LibraryView: View {
     @State private var watchlist: [MediaItem] = []
     @State private var traktError: String?
 
-    private let columns = [GridItem(.adaptive(minimum: Theme.railPosterWidth, maximum: Theme.railPosterWidth + 40), spacing: 16)]
+    private var columns: [GridItem] { [GridItem(.adaptive(minimum: Theme.railPosterWidth, maximum: Theme.railPosterWidth + 40), spacing: 16)] }
 
     var body: some View {
         ScrollView {
@@ -79,8 +79,9 @@ struct LibraryView: View {
         guard model.trakt.isSignedIn else { return }
         traktError = nil
         do {
-            async let playback = model.trakt.playback()
-            async let list = model.trakt.watchlist()
+            let trakt = model.trakt
+            async let playback = trakt.playback()
+            async let list = trakt.watchlist()
             traktPlayback = try await playback
             let entries = try await list
             watchlist = entries.compactMap { entry in

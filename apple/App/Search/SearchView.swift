@@ -8,7 +8,7 @@ struct SearchView: View {
     @State private var isSearching = false
     @State private var message: String?
 
-    private let columns = [GridItem(.adaptive(minimum: Theme.railPosterWidth, maximum: Theme.railPosterWidth + 40), spacing: 16)]
+    private var columns: [GridItem] { [GridItem(.adaptive(minimum: Theme.railPosterWidth, maximum: Theme.railPosterWidth + 40), spacing: 16)] }
 
     var body: some View {
         ScrollView {

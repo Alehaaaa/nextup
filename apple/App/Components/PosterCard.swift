@@ -21,12 +21,13 @@ struct ArtworkImage: View {
 
 struct PosterCard: View {
     let item: MediaItem
-    var width: CGFloat = Theme.railPosterWidth
+    var width: CGFloat? = nil
     var progress: Double? = nil
     var caption: String? = nil
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
+        let width = self.width ?? Theme.railPosterWidth
+        return VStack(alignment: .leading, spacing: 6) {
             ArtworkImage(url: item.posterURL)
                 .frame(width: width, height: width / Theme.posterAspect)
                 .clipShape(RoundedRectangle(cornerRadius: Theme.corner, style: .continuous))
