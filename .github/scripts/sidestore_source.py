@@ -172,6 +172,12 @@ def main() -> None:
     p.add_argument("--sha", required=True)
     p.add_argument("--commit-message", default="")
     p.add_argument("--keep", type=int, default=10)
+    p.add_argument(
+        "--flavor",
+        choices=["flutter", "native"],
+        default="flutter",
+        help="native: the SwiftUI app in apple/, published as its own source",
+    )
     args = p.parse_args()
 
     info = plistlib.loads((args.app / "Info.plist").read_bytes())
@@ -267,6 +273,29 @@ def main() -> None:
         ],
         "news": [],
     }
+
+    if args.flavor == "native":
+        # A separate identifier lets both sources sit side by side in SideStore.
+        source["identifier"] = f"io.github.{args.repo.split('/')[0].lower()}.nextup.native.commits"
+        source["name"] = "Nextup Native (beta)"
+        source["subtitle"] = "The native SwiftUI Nextup for iPhone and iPad, built from every commit."
+        app = source["apps"][0]
+        app["name"] = "Nextup Native"
+        app["subtitle"] = "Native beta of Nextup for iPhone and iPad."
+        app["localizedDescription"] = (
+            "A native SwiftUI rebuild of Nextup, shared with the Mac app. It is in early "
+            "development and does not yet have every feature of the main app.\n\n"
+            "• TMDB home rows, search and title pages\n"
+            "• Stremio addons for catalogs and streams\n"
+            "• Real-Debrid and TorBox playback\n"
+            "• Trakt sign-in, scrobbling, paused items and watchlist\n"
+            "• Continue Watching on this device\n\n"
+            "Nextup doesn't host or provide any content; you connect the services you "
+            "already use.\n\n"
+            "These are untested builds of every commit, made by GitHub Actions. SideStore or "
+            "AltStore re-signs them with your own certificate on install. Nextup is an "
+            "independent fork of Debrify and isn't affiliated with the official project."
+        )
 
     text = json.dumps(source, indent=2, ensure_ascii=False) + "\n"
     validate(json.loads(text))

@@ -1,0 +1,212 @@
+name: Apple native release
+
+# Native (SwiftUI) counterpart of ios-commit.yml: builds the app in apple/ from
+# the `swift` branch, publishes a sideloadable IPA plus a Mac zip as a
+# pre-release, and updates a SideStore/AltStore source at:
+#   https://raw.githubusercontent.com/<owner>/<repo>/sidestore-native/apps.json
+#
+# OFF until the first native version is finished. Turn it on by setting the
+# repository variable NATIVE_RELEASES to "on" (Settings → Secrets and
+# variables → Actions → Variables). Until then every job is skipped, and
+# apple.yml still compile-checks each push.
+#
+# Kept apart from the Flutter app's releases on purpose:
+#   - tags are native-build-<n>-<sha>, so the Flutter app's updater, which
+#     looks for build-<n>-<sha>, never offers a native build;
+#   - the source lives on its own `sidestore-native` branch, so the Flutter
+#     source on `sidestore` is untouched.
+
+on:
+  push:
+    branches: [swift]
+    paths: ['apple/**', '.github/workflows/apple-release.yml', '.github/scripts/sidestore_source.py']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: apple-release-${{ github.sha }}
+  cancel-in-progress: false
+
+env:
+  SOURCE_BRANCH: sidestore-native
+
+jobs:
+  ios:
+    if: vars.NATIVE_RELEASES == 'on' && github.ref_name == 'swift'
+    runs-on: macos-15
+    timeout-minutes: 45
+    outputs:
+      release_tag: ${{ steps.publish.outputs.release_tag }}
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        filter: blob:none
+
+    - name: Generate Xcode project
+      working-directory: apple
+      run: |
+        brew install xcodegen
+        xcodegen generate
+
+    # Same scheme as the Flutter workflow: a UTC timestamp build number that
+    # always increases, so SideStore sees each commit as an update.
+    - name: Build iOS (unsigned)
+      working-directory: apple
+      env:
+        TMDB_READ_ACCESS_TOKEN: ${{ secrets.TMDB_READ_ACCESS_TOKEN }}
+      run: |
+        set -euo pipefail
+        xcodebuild -project Nextup.xcodeproj -scheme Nextup-iOS -configuration Release \
+          -destination 'generic/platform=iOS' -derivedDataPath build \
+          CODE_SIGNING_ALLOWED=NO CODE_SIGN_IDENTITY="" \
+          CURRENT_PROJECT_VERSION="$(date -u +%Y%m%d%H%M)" \
+          TMDB_READ_ACCESS_TOKEN="${TMDB_READ_ACCESS_TOKEN}" \
+          build | tee build-ios.log | grep -E "error:|BUILD" || true
+        test -d build/Build/Products/Release-iphoneos/Nextup.app
+
+    # Unsigned Mach-Os have no room for a signature and SideStore/ldid abort.
+    # Ad-hoc signing reserves it; SideStore re-signs with the user's cert.
+    - name: Ad-hoc sign for sideloading
+      working-directory: apple
+      run: |
+        set -euo pipefail
+        APP=build/Build/Products/Release-iphoneos/Nextup.app
+        for f in "$APP"/Frameworks/*.framework "$APP"/Frameworks/*.dylib; do
+          [ -e "$f" ] && codesign -f -s - --timestamp=none "$f"
+        done
+        codesign -f -s - --timestamp=none "$APP"
+        if [ "$(otool -l "$APP/Nextup" | grep -c LC_CODE_SIGNATURE)" -eq 0 ]; then
+          echo "::error::Nextup binary left unsigned; IPA would not sideload"
+          exit 1
+        fi
+
+    - name: Package IPA
+      id: ipa
+      working-directory: apple
+      run: |
+        set -euo pipefail
+        NAME="nextup-native-ios-${{ github.run_number }}-${GITHUB_SHA::7}.ipa"
+        cd build/Build/Products/Release-iphoneos
+        rm -rf Payload && mkdir Payload
+        cp -R Nextup.app Payload/
+        zip -qry "$NAME" Payload
+        rm -rf Payload
+        echo "name=$NAME" >> "$GITHUB_OUTPUT"
+
+    - name: Upload IPA artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: nextup-native-ios-${{ github.run_number }}
+        path: apple/build/Build/Products/Release-iphoneos/${{ steps.ipa.outputs.name }}
+
+    - name: Publish pre-release and SideStore source
+      id: publish
+      env:
+        GH_TOKEN: ${{ github.token }}
+        IPA_NAME: ${{ steps.ipa.outputs.name }}
+        COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
+      run: |
+        set -euo pipefail
+        COMMIT_MESSAGE="${COMMIT_MESSAGE:-$(git log -1 --pretty=%B)}"
+        PRODUCTS=apple/build/Build/Products/Release-iphoneos
+        IPA="$PRODUCTS/$IPA_NAME"
+        RELEASE_TAG="native-build-${GITHUB_RUN_NUMBER}-${GITHUB_SHA::7}"
+        BASE="https://github.com/$GITHUB_REPOSITORY/releases/download/$RELEASE_TAG"
+        SOURCE_URL="https://raw.githubusercontent.com/$GITHUB_REPOSITORY/$SOURCE_BRANCH/apps.json"
+
+        if ! gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+          gh release create "$RELEASE_TAG" --prerelease --target "$GITHUB_SHA" \
+            --title "Nextup native build #$GITHUB_RUN_NUMBER (${GITHUB_SHA::7})" \
+            --notes "Native SwiftUI build of commit $GITHUB_SHA on $GITHUB_REF_NAME. Publishing in progress."
+        fi
+        gh release upload "$RELEASE_TAG" "$IPA" --clobber
+        echo "release_tag=$RELEASE_TAG" >> "$GITHUB_OUTPUT"
+
+        SRC="$RUNNER_TEMP/sidestore"
+        git config --global user.name "github-actions[bot]"
+        git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+        for attempt in 1 2 3 4 5; do
+          rm -rf "$SRC"
+          if git ls-remote --exit-code origin "refs/heads/$SOURCE_BRANCH" >/dev/null; then
+            git clone -q --depth 2 --branch "$SOURCE_BRANCH" \
+              "https://x-access-token:${GH_TOKEN}@github.com/$GITHUB_REPOSITORY.git" "$SRC"
+            PREVIOUS="$SRC/apps.json"
+          else
+            git init -q -b "$SOURCE_BRANCH" "$SRC"
+            git -C "$SRC" remote add origin "https://x-access-token:${GH_TOKEN}@github.com/$GITHUB_REPOSITORY.git"
+            PREVIOUS="$RUNNER_TEMP/none.json"
+          fi
+
+          python3 .github/scripts/sidestore_source.py \
+            --app "$PRODUCTS/Nextup.app" \
+            --ipa "$IPA" \
+            --download-url "$BASE/$IPA_NAME" \
+            --previous "$PREVIOUS" \
+            --output "$SRC/apps.json" \
+            --repo "$GITHUB_REPOSITORY" \
+            --branch "$GITHUB_REF_NAME" \
+            --sha "$GITHUB_SHA" \
+            --commit-message "$COMMIT_MESSAGE" \
+            --flavor native
+
+          git -C "$SRC" add apps.json
+          git -C "$SRC" commit -q -m "Publish native build ${{ github.run_number }} from ${GITHUB_SHA::7}"
+          if git -C "$SRC" push -q origin "HEAD:refs/heads/$SOURCE_BRANCH"; then
+            break
+          fi
+          [ "$attempt" -lt 5 ] || { echo "::error::could not publish the source"; exit 1; }
+          sleep $((attempt * 3))
+        done
+
+        printf 'Native SwiftUI build of commit %s on %s.\n\n**iOS:** %s\n**macOS:** attached by the next job\n\n**SideStore source:** %s\n' \
+          "$GITHUB_SHA" "$GITHUB_REF_NAME" "$IPA_NAME" "$SOURCE_URL" > "$RUNNER_TEMP/notes.md"
+        gh release edit "$RELEASE_TAG" --notes-file "$RUNNER_TEMP/notes.md"
+
+        echo "### SideStore source" >> "$GITHUB_STEP_SUMMARY"
+        echo "\`$SOURCE_URL\`" >> "$GITHUB_STEP_SUMMARY"
+
+  # The same commit's Mac app, attached to the release the iOS job published.
+  macos:
+    needs: ios
+    if: needs.ios.outputs.release_tag != ''
+    runs-on: macos-15
+    timeout-minutes: 45
+    env:
+      RELEASE_TAG: ${{ needs.ios.outputs.release_tag }}
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Generate Xcode project
+      working-directory: apple
+      run: |
+        brew install xcodegen
+        xcodegen generate
+
+    - name: Build macOS app
+      working-directory: apple
+      env:
+        TMDB_READ_ACCESS_TOKEN: ${{ secrets.TMDB_READ_ACCESS_TOKEN }}
+      run: |
+        set -euo pipefail
+        xcodebuild -project Nextup.xcodeproj -scheme Nextup-macOS -configuration Release \
+          -destination 'generic/platform=macOS' -derivedDataPath build \
+          CODE_SIGN_IDENTITY="-" CODE_SIGN_STYLE=Manual DEVELOPMENT_TEAM="" \
+          CURRENT_PROJECT_VERSION="$(date -u +%Y%m%d%H%M)" \
+          TMDB_READ_ACCESS_TOKEN="${TMDB_READ_ACCESS_TOKEN}" \
+          build | tee build-macos.log | grep -E "error:|BUILD" || true
+        test -d build/Build/Products/Release/Nextup.app
+
+    - name: Package and publish
+      working-directory: apple/build/Build/Products/Release
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        set -euo pipefail
+        ZIP="nextup-${RELEASE_TAG}-macos.zip"
+        /usr/bin/ditto -c -k --sequesterRsrc --keepParent Nextup.app "$ZIP"
+        gh release upload "$RELEASE_TAG" "$ZIP" --clobber --repo "$GITHUB_REPOSITORY"
