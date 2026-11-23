@@ -7463,16 +7463,17 @@ class StorageService {
   }
 
   // YouTube Settings
-  /// Preferred max playback height for YouTube (1080/720/480/360). Default 1080.
+  /// Preferred max playback height for YouTube (2160/1440/1080/720/480/360).
+  /// Default 1080.
   static Future<int> getYoutubeMaxHeight() async {
     final prefs = await ProfilePreferences.instance();
     final v = prefs.getInt(_youtubeMaxHeightKey);
-    return (v != null && v > 0) ? v.clamp(144, 1080) : 1080;
+    return (v != null && v > 0) ? v.clamp(144, 2160) : 1080;
   }
 
   static Future<void> setYoutubeMaxHeight(int height) async {
     final prefs = await ProfilePreferences.instance();
-    await prefs.setInt(_youtubeMaxHeightKey, height.clamp(144, 1080));
+    await prefs.setInt(_youtubeMaxHeightKey, height.clamp(144, 2160));
   }
 
   /// Android TV IPTV video decoder: 'auto' | 'hardware' | 'software'.

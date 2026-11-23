@@ -54,7 +54,8 @@ class YoutubeSearchResult {
 /// video share the same separate [YoutubeResolvedStreams.audioUrl], so switching
 /// quality only swaps the video URL — the player re-muxes the same audio.
 ///
-/// Entries are capped at 1080p. AV1 is excluded for decoder compatibility.
+/// Entries are capped at 2160p (above 1080p YouTube serves VP9 only). AV1 is
+/// excluded for decoder compatibility.
 /// One closed-caption / subtitle track offered by YouTube for a video.
 ///
 /// [url] is a direct WebVTT URL (YouTube's timedtext endpoint requested with
@@ -85,9 +86,9 @@ class YoutubeQuality {
 /// Resolved playable/downloadable URLs for a single YouTube video.
 class YoutubeResolvedStreams {
   /// Video stream to play. When [audioUrl] is set this is a *video-only*
-  /// adaptive stream (always H.264, capped at the user's preferred height) and
-  /// the player must mux in [audioUrl]; otherwise it is a muxed (audio+video)
-  /// progressive stream. Playback and [qualities] are capped at 1080p.
+  /// adaptive stream (H.264, or VP9 above 1080p; capped at the user's
+  /// preferred height) and the player must mux in [audioUrl]; otherwise it is a
+  /// muxed (audio+video) progressive stream. Playback and [qualities] are capped at 2160p.
   final String? playUrl;
 
   /// Separate audio track to play alongside a video-only [playUrl]. Null when
@@ -111,7 +112,7 @@ class YoutubeResolvedStreams {
   final int? durationSeconds;
 
   /// All video-only qualities available (highest first), for in-player quality
-  /// switching. H.264 or VP9 up to 1080p; AV1 excluded.
+  /// switching. H.264 or VP9 up to 2160p; AV1 excluded.
   /// Populated only in the separate-audio path (each entry pairs with the shared
   /// [audioUrl]); empty when only a muxed stream exists.
   final List<YoutubeQuality> qualities;
@@ -590,7 +591,7 @@ class YoutubeService {
   }) {
     final key = _resolveKey(
       videoId,
-      maxHeightOverride.clamp(144, 1080),
+      maxHeightOverride.clamp(144, 2160),
       false,
       preferVp9,
       false,
@@ -610,7 +611,7 @@ class YoutubeService {
   }) {
     final key = _resolveKey(
       videoId,
-      maxHeightOverride.clamp(144, 1080),
+      maxHeightOverride.clamp(144, 2160),
       false,
       preferVp9,
       false,
@@ -710,7 +711,7 @@ class YoutubeService {
         ),
       );
     }
-    maxHeightOverride = maxHeightOverride.clamp(144, 1080);
+    maxHeightOverride = maxHeightOverride.clamp(144, 2160);
     // Cobalt relay policy. Trailers and reels (no metadata, no captions) try
     // it first: it is what still works when YouTube bot-checks this device.
     // Full playback wants metadata, captions, quality switching and seeking,
@@ -1407,8 +1408,13 @@ class YoutubeService {
     final bestMuxed = bestMuxedStream?.url.toString();
     final bestMuxedHeight = bestMuxedStream?.videoResolution.height;
 
-    // Use adaptive H.264/VP9 plus AAC, capped at 1080p. AV1 remains
-    // excluded because decoder support varies across the player matrix.
+    // Use adaptive H.264/VP9 plus AAC, up to 2160p. AV1 remains excluded
+    // because decoder support varies across the player matrix (mpv on macOS
+    // stalls on it). VP9 is what unlocks resolutions above 1080p: YouTube
+    // serves 1440p/2160p only in VP9/AV1, never H.264. Every height <=1080p
+    // still resolves to H.264 (the tie-break below keeps it), so VP9 becomes
+    // the default pick only when the user raises the Quality preference to
+    // 1440p/2160p and the video offers it.
     bool isAvc(String c) => c.toLowerCase().contains('avc');
     bool isVp9(String c) {
       final l = c.toLowerCase();
@@ -1421,7 +1427,7 @@ class YoutubeService {
     final videoOnly = manifest.videoOnly
         .where(
           (s) =>
-              s.videoResolution.height <= 1080 &&
+              s.videoResolution.height <= 2160 &&
               (isAvc(s.videoCodec) || isVp9(s.videoCodec)),
         )
         .toList();
@@ -1464,7 +1470,7 @@ class YoutubeService {
         qualities.add(YoutubeQuality(height: h, videoUrl: s.url.toString()));
       }
 
-      // Select within the preference; all switchable qualities stay <=1080p.
+      // Select within the preference; all switchable qualities stay <=2160p.
       final atOrBelow = qualities.where((q) => q.height <= maxHeight).toList();
       playUrl =
           (atOrBelow.isNotEmpty ? atOrBelow.first : qualities.last).videoUrl;

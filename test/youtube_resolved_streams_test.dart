@@ -27,7 +27,7 @@ void main() {
       await YoutubeService.resolveStreams('aaaaaaaaaaa');
       await StorageService.setYoutubeMaxHeight(2160);
       await YoutubeService.resolveStreams('aaaaaaaaaaa');
-      expect(requested, [720, 1080]);
+      expect(requested, [720, 2160]);
     });
     test('expiring relay URLs are never returned from warm cache', () async {
       var calls = 0;
@@ -52,7 +52,7 @@ void main() {
       );
       expect(calls, 2);
     });
-    test('explicit high-resolution overrides are capped at 1080p', () async {
+    test('explicit high-resolution overrides are capped at 2160p', () async {
       final requested = <int>[];
       YoutubeService.streamResolverOverride =
           (id, height, cc, vp9, meta, muxed, client) async {
@@ -61,9 +61,9 @@ void main() {
           };
       await YoutubeService.resolvePreviewStreams(
         'aaaaaaaaaaa',
-        maxHeightOverride: 2160,
+        maxHeightOverride: 4320,
       );
-      expect(requested, [1080]);
+      expect(requested, [2160]);
     });
     test('visible Reel promotes its existing YouTube extraction', () async {
       final gates = [
