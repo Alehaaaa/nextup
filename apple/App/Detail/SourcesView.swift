@@ -48,6 +48,9 @@ struct SourcesView: View {
         .task { await load() }
         #if os(macOS)
         .frame(minWidth: 620, minHeight: 520)
+        #else
+        .presentationDetents([.medium, .large])
+        .presentationDragIndicator(.visible)
         #endif
     }
 
@@ -162,7 +165,7 @@ private struct StreamRow: View {
             Text(stream.quality.label)
                 .font(.caption.weight(.bold))
                 .padding(.horizontal, 8).padding(.vertical, 4)
-                .background(Theme.accent.opacity(0.25), in: Capsule())
+                .glassEffect(.regular.tint(Theme.accent.opacity(0.6)), in: Capsule())
                 .frame(width: 56)
             VStack(alignment: .leading, spacing: 4) {
                 Text(stream.headline.replacingOccurrences(of: "\n", with: " "))

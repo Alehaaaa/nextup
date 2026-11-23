@@ -13,6 +13,7 @@ struct TitleDetailView: View {
     @State private var sourceTarget: SourceTarget?
     @State private var pendingPlayback: PlaybackRequest?
     @Environment(\.play) private var play
+    @Environment(\.isCompactWidth) private var isCompact
     @State private var error: String?
 
     init(item: MediaItem) {
@@ -23,12 +24,12 @@ struct TitleDetailView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 24) {
                 header
-                actions.padding(.horizontal)
+                actions.padding(.horizontal, Theme.gutter)
                 if let error {
-                    Label(error, systemImage: "exclamationmark.triangle").foregroundStyle(.secondary).padding(.horizontal)
+                    Label(error, systemImage: "exclamationmark.triangle").foregroundStyle(.secondary).padding(.horizontal, Theme.gutter)
                 }
                 if !item.overview.isEmpty {
-                    Text(item.overview).font(.body).foregroundStyle(.secondary).padding(.horizontal)
+                    Text(item.overview).font(.body).foregroundStyle(.white.opacity(0.78)).padding(.horizontal, Theme.gutter)
                         .frame(maxWidth: 820, alignment: .leading)
                 }
                 if item.kind == .series { episodesSection }
@@ -39,8 +40,10 @@ struct TitleDetailView: View {
                     }
                 }
             }
-            .padding(.bottom, 32)
+            .padding(.bottom, 40)
         }
+        .scrollEdgeEffectStyle(.soft, for: .top)
+        .ignoresSafeArea(edges: .top)
         .nextupBackground()
         .navigationTitle(item.title)
         .inlineTitle()
@@ -53,24 +56,35 @@ struct TitleDetailView: View {
 
     // MARK: Sections
 
+    private var headerHeight: CGFloat { isCompact ? 480 : 560 }
+
+    /// Full-bleed artwork that runs under the glass toolbar, with the title set over it.
     private var header: some View {
         ZStack(alignment: .bottomLeading) {
             ArtworkImage(url: item.backdropURL ?? item.posterURL)
                 .frame(maxWidth: .infinity)
-                .frame(height: 340)
+                .frame(height: headerHeight)
                 .clipped()
-            LinearGradient(colors: [.clear, Theme.background], startPoint: .top, endPoint: .bottom)
-            HStack(alignment: .bottom, spacing: 16) {
-                ArtworkImage(url: item.posterURL)
-                    .frame(width: 110, height: 165)
-                    .clipShape(RoundedRectangle(cornerRadius: Theme.corner, style: .continuous))
-                VStack(alignment: .leading, spacing: 6) {
-                    Text(item.title).font(.title.weight(.bold)).lineLimit(2)
-                    if let tagline = detail?.tagline { Text(tagline).font(.callout).italic().foregroundStyle(.secondary) }
-                    Text(facts).font(.footnote).foregroundStyle(.secondary)
+                .backgroundExtensionEffect()
+            LinearGradient(stops: [
+                .init(color: .clear, location: 0.3),
+                .init(color: Theme.background.opacity(0.75), location: 0.75),
+                .init(color: Theme.background, location: 1),
+            ], startPoint: .top, endPoint: .bottom)
+            VStack(alignment: .leading, spacing: 8) {
+                Text(item.title)
+                    .font(.system(size: isCompact ? 34 : 46, weight: .heavy))
+                    .lineLimit(2)
+                    .minimumScaleFactor(0.7)
+                if let tagline = detail?.tagline {
+                    Text(tagline).font(.callout).italic().foregroundStyle(.white.opacity(0.75))
+                }
+                if !facts.isEmpty {
+                    Text(facts).font(.subheadline.weight(.medium)).foregroundStyle(.white.opacity(0.75))
                 }
             }
-            .padding()
+            .padding(.horizontal, Theme.gutter)
+            .padding(.bottom, 8)
         }
     }
 
@@ -88,26 +102,30 @@ struct TitleDetailView: View {
     }
 
     private var actions: some View {
-        HStack(spacing: 12) {
-            Button {
-                playPrimary()
-            } label: {
-                Label(primaryLabel, systemImage: "play.fill").frame(minWidth: 140)
-            }
-            .buttonStyle(.borderedProminent)
-            .controlSize(.large)
-            .disabled(item.imdbID == nil)
+        GlassEffectContainer(spacing: 12) {
+            HStack(spacing: 12) {
+                Button {
+                    playPrimary()
+                } label: {
+                    Label(primaryLabel, systemImage: "play.fill")
+                        .frame(minWidth: isCompact ? nil : 160)
+                        .frame(maxWidth: isCompact ? .infinity : nil)
+                }
+                .buttonStyle(.glassProminent)
+                .disabled(item.imdbID == nil)
 
-            if let key = detail?.trailerYouTubeKey, let url = URL(string: "https://www.youtube.com/watch?v=\(key)") {
-                Link(destination: url) { Label("Trailer", systemImage: "film") }
-                    .buttonStyle(.bordered)
-                    .controlSize(.large)
+                if let key = detail?.trailerYouTubeKey, let url = URL(string: "https://www.youtube.com/watch?v=\(key)") {
+                    Link(destination: url) { Image(systemName: "film") }
+                        .buttonStyle(.glass)
+                        .accessibilityLabel("Trailer")
+                }
+                if let imdb = item.imdbID, let url = URL(string: "https://www.imdb.com/title/\(imdb)/") {
+                    ShareLink(item: url) { Image(systemName: "square.and.arrow.up") }
+                        .buttonStyle(.glass)
+                        .accessibilityLabel("Share")
+                }
             }
-            if let imdb = item.imdbID, let url = URL(string: "https://www.imdb.com/title/\(imdb)/") {
-                ShareLink(item: url) { Label("Share", systemImage: "square.and.arrow.up") }
-                    .buttonStyle(.bordered)
-                    .controlSize(.large)
-            }
+            .controlSize(.large)
         }
     }
 
@@ -139,39 +157,61 @@ struct TitleDetailView: View {
         return Array(Set(addonEpisodes.map(\.season))).sorted()
     }
 
+    /// Season chips, then episodes: a list on iPhone, an episode rail on iPad and Mac.
     @ViewBuilder
     private var episodesSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Text("Episodes").font(.title3.weight(.semibold))
-                Spacer()
-                if seasonNumbers.count > 1 {
-                    Picker("Season", selection: $season) {
-                        ForEach(seasonNumbers, id: \.self) { Text("Season \($0)").tag($0) }
+        VStack(alignment: .leading, spacing: 14) {
+            Text("Episodes").font(.title3.weight(.bold)).padding(.horizontal, Theme.gutter)
+
+            if seasonNumbers.count > 1 {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    GlassEffectContainer(spacing: 8) {
+                        HStack(spacing: 8) {
+                            ForEach(seasonNumbers, id: \.self) { number in
+                                Button("Season \(number)") { season = number }
+                                    .buttonStyle(SeasonChipStyle(selected: number == season))
+                            }
+                        }
                     }
-                    .pickerStyle(.menu)
-                    .fixedSize()
+                    .padding(.horizontal, Theme.gutter)
                 }
+                .scrollClipDisabled()
             }
-            .padding(.horizontal)
 
             if loadingEpisodes {
                 ProgressView().frame(maxWidth: .infinity)
-            } else {
-                LazyVStack(spacing: 10) {
+            } else if isCompact {
+                LazyVStack(spacing: 12) {
                     ForEach(episodes) { episode in
-                        Button {
-                            sourceTarget = SourceTarget(item: item, season: episode.season, episode: episode.number, episodeTitle: episode.title)
-                        } label: {
+                        Button { openSources(for: episode) } label: {
                             EpisodeRow(episode: episode, progress: progress(for: episode))
                         }
                         .buttonStyle(.plain)
                     }
                 }
-                .padding(.horizontal)
+                .padding(.horizontal, Theme.gutter)
+            } else {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    LazyHStack(alignment: .top, spacing: 16) {
+                        ForEach(episodes) { episode in
+                            Button { openSources(for: episode) } label: {
+                                EpisodeCard(episode: episode, progress: progress(for: episode))
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                    .padding(.horizontal, Theme.gutter)
+                    .scrollTargetLayout()
+                }
+                .scrollClipDisabled()
+                .scrollTargetBehavior(.viewAligned)
             }
         }
         .task(id: season) { await loadEpisodes() }
+    }
+
+    private func openSources(for episode: Episode) {
+        sourceTarget = SourceTarget(item: item, season: episode.season, episode: episode.number, episodeTitle: episode.title)
     }
 
     private func progress(for episode: Episode) -> Double? {
@@ -182,7 +222,7 @@ struct TitleDetailView: View {
 
     private func castRail(_ cast: [CastMember]) -> some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("Cast").font(.title3.weight(.semibold)).padding(.horizontal)
+            Text("Cast").font(.title3.weight(.bold)).padding(.horizontal, Theme.gutter)
             ScrollView(.horizontal, showsIndicators: false) {
                 LazyHStack(alignment: .top, spacing: 14) {
                     ForEach(cast) { person in
@@ -196,7 +236,7 @@ struct TitleDetailView: View {
                         .frame(width: 88)
                     }
                 }
-                .padding(.horizontal)
+                .padding(.horizontal, Theme.gutter)
             }
         }
     }
@@ -253,20 +293,51 @@ struct TitleDetailView: View {
     }
 }
 
+private struct SeasonChipStyle: ButtonStyle {
+    let selected: Bool
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(.subheadline.weight(.semibold))
+            .padding(.horizontal, 16).padding(.vertical, 9)
+            .foregroundStyle(selected ? .black : .white)
+            .glassEffect(selected ? .regular.tint(.white).interactive() : .regular.interactive(), in: Capsule())
+            .scaleEffect(configuration.isPressed ? 0.96 : 1)
+            .animation(.snappy, value: configuration.isPressed)
+    }
+}
+
+private struct EpisodeThumb: View {
+    let episode: Episode
+    var progress: Double?
+    var width: CGFloat
+
+    var body: some View {
+        ArtworkImage(url: episode.stillURL)
+            .frame(width: width, height: width * 9 / 16)
+            .overlay(alignment: .bottom) {
+                if let progress, progress > 0 {
+                    ProgressView(value: progress).tint(.white).padding(8)
+                }
+            }
+            .overlay {
+                Image(systemName: "play.fill")
+                    .font(.headline)
+                    .padding(12)
+                    .glassEffect(.regular, in: Circle())
+            }
+            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+    }
+}
+
+/// iPhone: one episode per row.
 private struct EpisodeRow: View {
     let episode: Episode
     var progress: Double?
 
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
-            ArtworkImage(url: episode.stillURL)
-                .frame(width: 160, height: 90)
-                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-                .overlay(alignment: .bottom) {
-                    if let progress, progress > 0 {
-                        ProgressView(value: progress).tint(Theme.accent).padding(6)
-                    }
-                }
+            EpisodeThumb(episode: episode, progress: progress, width: 150)
             VStack(alignment: .leading, spacing: 4) {
                 Text("\(episode.number). \(episode.title)").font(.subheadline.weight(.semibold)).lineLimit(2)
                 if let runtime = Format.runtime(episode.runtimeMinutes) {
@@ -277,10 +348,24 @@ private struct EpisodeRow: View {
                 }
             }
             Spacer(minLength: 0)
-            Image(systemName: "play.circle").font(.title2).foregroundStyle(Theme.accent)
         }
-        .padding(10)
-        .glassCard(cornerRadius: 12)
+        .contentShape(Rectangle())
+    }
+}
+
+/// iPad and Mac: a landscape card in the episode rail.
+private struct EpisodeCard: View {
+    let episode: Episode
+    var progress: Double?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            EpisodeThumb(episode: episode, progress: progress, width: 300)
+            Text("\(episode.number). \(episode.title)").font(.subheadline.weight(.semibold)).lineLimit(1)
+            Text(episode.overview.isEmpty ? (Format.runtime(episode.runtimeMinutes) ?? " ") : episode.overview)
+                .font(.caption).foregroundStyle(.secondary).lineLimit(2)
+        }
+        .frame(width: 300, alignment: .leading)
         .contentShape(Rectangle())
     }
 }

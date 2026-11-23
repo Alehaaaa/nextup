@@ -7,7 +7,7 @@ struct LibraryView: View {
     @State private var watchlist: [MediaItem] = []
     @State private var traktError: String?
 
-    private var columns: [GridItem] { [GridItem(.adaptive(minimum: Theme.railPosterWidth, maximum: Theme.railPosterWidth + 40), spacing: 16)] }
+    private var columns: [GridItem] { [GridItem(.adaptive(minimum: Theme.railWideWidth, maximum: Theme.railWideWidth + 80), spacing: 16)] }
 
     var body: some View {
         ScrollView {
@@ -20,8 +20,8 @@ struct LibraryView: View {
                         LazyVGrid(columns: columns, alignment: .leading, spacing: 20) {
                             ForEach(entries) { entry in
                                 NavigationLink(value: entry.item) {
-                                    PosterCard(item: entry.item, progress: entry.fraction,
-                                               caption: entry.season.flatMap { s in entry.episode.map { String(format: "S%02dE%02d", s, $0) } })
+                                    WideCard(item: entry.item, width: Theme.railWideWidth, progress: entry.fraction,
+                                             caption: entry.season.flatMap { s in entry.episode.map { String(format: "S%02dE%02d", s, $0) } })
                                 }
                                 .buttonStyle(.plain)
                                 .contextMenu { TitleContextMenu(item: entry.item) { model.removeFromContinueWatching(entry.id) } }
@@ -60,7 +60,8 @@ struct LibraryView: View {
                     }
                 }
             }
-            .padding()
+            .padding(.horizontal, Theme.gutter)
+            .padding(.vertical)
         }
         .nextupBackground()
         .navigationTitle("Library")

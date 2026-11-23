@@ -16,7 +16,7 @@ platforms and does something useful end to end.
 
 ```
 apple/
-  project.yml                 XcodeGen spec: one multiplatform app target (iOS 17+, macOS 14+)
+  project.yml                 XcodeGen spec: iOS and macOS app targets sharing one source tree (iOS 26+, macOS 26+)
   App/                        SwiftUI app (shared by iOS and macOS)
     Shell/                    App entry, tab bar (iPhone) / sidebar (iPad, Mac), routing, deep links
     Home/ Search/ Detail/     Discovery screens
@@ -50,13 +50,27 @@ Generate the Xcode project with `brew install xcodegen && cd apple && xcodegen`,
 | 7 | Backup/restore compatible with the Flutter app's export format, WebDAV saved syncs, profiles | |
 | 8 | Polish: Looks (structure + palette), Mac menus/commands, iPad multitasking, accessibility, localisation, release workflow (IPA + SideStore source, DMG) | |
 
+## Look and feel
+
+Reference: Cedar (cedartv.github.io/cedar-tv-updates), native Liquid Glass.
+
+- Near-black ground (#08090B) so artwork carries the colour; Nextup violet as tint.
+- Home: a full-bleed paging hero that runs under the glass chrome (`backgroundExtensionEffect`),
+  then rows ("branches") in three styles: poster, wide (landscape backdrop) and Top 10.
+- Title page: full-bleed artwork with the title over it, glass action buttons, season chips,
+  episodes as a list on iPhone and an episode rail on iPad/Mac.
+- Search opens on trending rows and a ranked "What Should I Watch" list before you type.
+- System chrome only: adaptable `TabView` (floating glass tab bar on iPhone, sidebar on iPad/Mac),
+  search tab role, glass / glassProminent buttons, `GlassEffectContainer` for grouped controls.
+- Requires iOS 26 / macOS 26 (Liquid Glass APIs). CI builds with the newest Xcode on the runner,
+  so newer SDK styling (iOS 27) is picked up automatically.
+
 ## Cross-platform rules
 
 - Every screen is one SwiftUI view used on both platforms. `#if os(...)` is allowed only for
   platform glue (window commands, haptics, `UIApplication`/`NSWorkspace`), never for a
   different layout of the same feature.
-- Navigation: `TabView` on compact width, `NavigationSplitView` sidebar on regular width and Mac.
-  Same sections in the same order on both.
+- Navigation: one `TabView` with `.sidebarAdaptable`. Same sections in the same order everywhere.
 - Business logic lives in `NextupKit` and never imports SwiftUI/UIKit/AppKit, so it can be unit
   tested with `swift test` and reused for a future tvOS target.
 - Secrets (debrid keys, tracker tokens) go in the Keychain; plain preferences in `UserDefaults`.

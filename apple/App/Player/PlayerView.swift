@@ -144,8 +144,10 @@ struct PlayerView: View {
         .overlay(alignment: .topLeading) {
             #if os(iOS)
             Button { close() } label: {
-                Image(systemName: "xmark").font(.headline).padding(12).background(.ultraThinMaterial, in: Circle())
+                Image(systemName: "xmark").font(.headline).padding(14)
             }
+            .buttonStyle(.plain)
+            .glassEffect(.regular.interactive(), in: Circle())
             .padding()
             .accessibilityLabel("Close player")
             #endif
@@ -168,9 +170,9 @@ struct PlayerView: View {
             Text(message).multilineTextAlignment(.center)
             HStack {
                 ForEach(controller.externalPlayers) { option in
-                    Button("Open in \(option.name)") { openURL(option.url) }.buttonStyle(.bordered)
+                    Button("Open in \(option.name)") { openURL(option.url) }.buttonStyle(.glass)
                 }
-                Button("Copy Link") { Clipboard.copy(request.url.absoluteString) }.buttonStyle(.bordered)
+                Button("Copy Link") { Clipboard.copy(request.url.absoluteString) }.buttonStyle(.glass)
             }
         }
         .padding(24)

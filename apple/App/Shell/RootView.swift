@@ -25,41 +25,35 @@ enum AppSection: String, CaseIterable, Hashable, Identifiable {
     }
 }
 
-/// One navigation model for every device: a tab bar when space is compact (iPhone),
-/// a sidebar when it is regular (iPad, Mac). Same sections, same order, same screens.
+/// One navigation model for every device. The adaptable tab view is a floating Liquid Glass
+/// tab bar on iPhone, and a sidebar on iPad and Mac. Search is the system search tab.
 struct RootView: View {
     @Environment(AppModel.self) private var model
-    @Environment(\.horizontalSizeClass) private var sizeClass
     #if os(macOS)
     @Environment(\.openWindow) private var openWindow
     #endif
     @State private var selection: AppSection = .home
 
     var body: some View {
-        Group {
-            if usesSidebar {
-                NavigationSplitView {
-                    List(sidebarSections, selection: Binding<AppSection?>(get: { selection }, set: { if let s = $0 { selection = s } })) { section in
-                        Label(section.title, systemImage: section.symbol).tag(section)
-                    }
-                    .navigationTitle("Nextup")
-                    #if os(macOS)
-                    .navigationSplitViewColumnWidth(min: 180, ideal: 200)
-                    #endif
-                } detail: {
-                    SectionStack(section: selection)
-                        .id(selection)
-                }
-            } else {
-                TabView(selection: $selection) {
-                    ForEach(AppSection.allCases) { section in
-                        SectionStack(section: section)
-                            .tabItem { Label(section.title, systemImage: section.symbol) }
-                            .tag(section)
-                    }
-                }
+        TabView(selection: $selection) {
+            Tab(AppSection.home.title, systemImage: AppSection.home.symbol, value: AppSection.home) {
+                SectionStack(section: .home)
+            }
+            Tab(AppSection.library.title, systemImage: AppSection.library.symbol, value: AppSection.library) {
+                SectionStack(section: .library)
+            }
+            #if !os(macOS)
+            // On the Mac, Settings lives in its own window (⌘,) like every Mac app.
+            Tab(AppSection.settings.title, systemImage: AppSection.settings.symbol, value: AppSection.settings) {
+                SectionStack(section: .settings)
+            }
+            #endif
+            Tab(value: AppSection.search, role: .search) {
+                SectionStack(section: .search)
             }
         }
+        .tabViewStyle(.sidebarAdaptable)
+        .tabBarMinimizeBehavior(.onScrollDown)
         .environment(\.play, playAction)
         #if os(macOS)
         .focusedSceneValue(\.sectionSelection, $selection)
@@ -76,23 +70,6 @@ struct RootView: View {
         PlayAction(model: model, openWindow: openWindow)
         #else
         PlayAction(model: model)
-        #endif
-    }
-
-    private var usesSidebar: Bool {
-        #if os(macOS)
-        return true
-        #else
-        return sizeClass == .regular
-        #endif
-    }
-
-    /// On the Mac, Settings lives in its own window (⌘,) like every Mac app.
-    private var sidebarSections: [AppSection] {
-        #if os(macOS)
-        return AppSection.allCases.filter { $0 != .settings }
-        #else
-        return AppSection.allCases
         #endif
     }
 }

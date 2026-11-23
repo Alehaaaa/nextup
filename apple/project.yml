@@ -3,8 +3,8 @@ name: Nextup
 options:
   bundleIdPrefix: com.alehaaaa
   deploymentTarget:
-    iOS: "17.0"
-    macOS: "14.0"
+    iOS: "26.0"
+    macOS: "26.0"
   createIntermediateGroups: true
   developmentLanguage: en
 

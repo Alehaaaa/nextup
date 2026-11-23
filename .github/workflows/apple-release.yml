@@ -35,7 +35,7 @@ env:
 jobs:
   ios:
     if: vars.NATIVE_RELEASES == 'on' && github.ref_name == 'swift'
-    runs-on: macos-15
+    runs-on: macos-26
     timeout-minutes: 45
     outputs:
       release_tag: ${{ steps.publish.outputs.release_tag }}
@@ -45,6 +45,14 @@ jobs:
       with:
         fetch-depth: 0
         filter: blob:none
+
+    - name: Select newest Xcode
+      run: |
+        set -euo pipefail
+        XCODE=$(ls -d /Applications/Xcode_*.app | grep -vi beta | sort -V | tail -n 1)
+        echo "Using $XCODE"
+        sudo xcode-select -s "$XCODE/Contents/Developer"
+        xcodebuild -version
 
     - name: Generate Xcode project
       working-directory: apple
@@ -173,13 +181,21 @@ jobs:
   macos:
     needs: ios
     if: needs.ios.outputs.release_tag != ''
-    runs-on: macos-15
+    runs-on: macos-26
     timeout-minutes: 45
     env:
       RELEASE_TAG: ${{ needs.ios.outputs.release_tag }}
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
+
+    - name: Select newest Xcode
+      run: |
+        set -euo pipefail
+        XCODE=$(ls -d /Applications/Xcode_*.app | grep -vi beta | sort -V | tail -n 1)
+        echo "Using $XCODE"
+        sudo xcode-select -s "$XCODE/Contents/Developer"
+        xcodebuild -version
 
     - name: Generate Xcode project
       working-directory: apple

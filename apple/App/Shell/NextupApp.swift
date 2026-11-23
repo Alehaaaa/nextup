@@ -45,7 +45,7 @@ struct NextupCommands: Commands {
 
     var body: some Commands {
         CommandMenu("Go") {
-            ForEach(Array(AppSection.allCases.enumerated()), id: \.element) { index, section in
+            ForEach(Array(AppSection.allCases.filter { $0 != .settings }.enumerated()), id: \.element) { index, section in
                 Button(section.title) { selection?.wrappedValue = section }
                     .keyboardShortcut(KeyEquivalent(Character(String(index + 1))), modifiers: .command)
             }

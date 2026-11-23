@@ -5,9 +5,10 @@ import UIKit
 import AppKit
 #endif
 
-/// Nextup's default look, carried over from the Flutter app's "Home" palette.
+/// Cinematic dark look: near-black ground so artwork carries the colour, Liquid Glass for chrome,
+/// Nextup's violet as the tint.
 enum Theme {
-    static let background = Color(red: 0x0D / 255, green: 0x0B / 255, blue: 0x1A / 255)
+    static let background = Color(red: 0x08 / 255, green: 0x09 / 255, blue: 0x0B / 255)
     static let surface = Color(red: 0x16 / 255, green: 0x13 / 255, blue: 0x1F / 255)
     static let accent = Color(red: 0x7B / 255, green: 0x5C / 255, blue: 0xFF / 255)
     static let focus = Color(red: 0xFB / 255, green: 0xBF / 255, blue: 0x24 / 255)
@@ -16,14 +17,33 @@ enum Theme {
     static let placeholder = Color(red: 0x11 / 255, green: 0x11 / 255, blue: 0x18 / 255)
 
     static let posterAspect: CGFloat = 2.0 / 3.0
-    static let corner: CGFloat = 10
+    static let corner: CGFloat = 14
+    static let wideAspect: CGFloat = 16.0 / 9.0
+
+    /// Side margin for rows and headers.
+    static var gutter: CGFloat {
+        #if os(macOS)
+        return 28
+        #else
+        return 20
+        #endif
+    }
 
     /// Poster width for rails, sized per platform so iPhone, iPad and Mac all show a sensible count.
+    /// Landscape card width for wide rows and Continue Watching.
+    @MainActor static var railWideWidth: CGFloat {
+        #if os(macOS)
+        return 300
+        #else
+        return UIDevice.current.userInterfaceIdiom == .pad ? 300 : 260
+        #endif
+    }
+
     @MainActor static var railPosterWidth: CGFloat {
         #if os(macOS)
         return 150
         #else
-        return UIDevice.current.userInterfaceIdiom == .pad ? 150 : 112
+        return UIDevice.current.userInterfaceIdiom == .pad ? 150 : 118
         #endif
     }
 }
@@ -34,9 +54,9 @@ extension View {
         background(Theme.background.ignoresSafeArea())
     }
 
-    /// Frosted surface used for cards and panels.
-    func glassCard(cornerRadius: CGFloat = 14) -> some View {
-        background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+    /// Liquid Glass panel for cards and controls that float over content.
+    func glassCard(cornerRadius: CGFloat = 18) -> some View {
+        glassEffect(.regular, in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
     }
 
     /// Inline navigation title on iOS; no-op on the Mac, which has no title display modes.
@@ -46,6 +66,17 @@ extension View {
         navigationBarTitleDisplayMode(.inline)
         #else
         self
+        #endif
+    }
+}
+
+extension EnvironmentValues {
+    /// iPhone-width layout. Always false on the Mac, where windows use the regular layout.
+    var isCompactWidth: Bool {
+        #if os(iOS)
+        return horizontalSizeClass == .compact
+        #else
+        return false
         #endif
     }
 }
