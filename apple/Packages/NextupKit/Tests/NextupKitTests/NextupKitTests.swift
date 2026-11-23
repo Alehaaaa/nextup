@@ -155,7 +155,7 @@ final class SyncCryptoTests: XCTestCase {
 
     func testNativeSyncRoundTripAndMerge() throws {
         let key = SymmetricKey(size: .bits256)
-        let item = MediaItem(kind: .movie, title: "A", imdbID: "tt1")
+        let item = MediaItem(kind: .movie, imdbID: "tt1", title: "A")
         let old = WatchProgress(item: item, position: 10, duration: 100, updatedAt: Date(timeIntervalSince1970: 100))
         let new = WatchProgress(item: item, position: 50, duration: 100, updatedAt: Date(timeIntervalSince1970: 200))
         let local = SyncState(settingsChangedAt: Date(timeIntervalSince1970: 300), addons: [], favorites: [item], watchlist: [],
