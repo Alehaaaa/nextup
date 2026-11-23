@@ -4,10 +4,7 @@ name: Apple native release
 # the `swift` branch, publishes a sideloadable IPA as a pre-release, and updates a SideStore/AltStore source at:
 #   https://raw.githubusercontent.com/<owner>/<repo>/sidestore-native/apps.json
 #
-# OFF until the first native version is finished. Turn it on by setting the
-# repository variable NATIVE_RELEASES to "on" (Settings → Secrets and
-# variables → Actions → Variables). Until then every job is skipped, and
-# apple.yml still compile-checks each push.
+# On for every push to `swift` that touches the app (enabled 2026-11-23).
 #
 # Kept apart from the Flutter app's releases on purpose:
 #   - tags are native-build-<n>-<sha>, so the Flutter app's updater, which
@@ -33,7 +30,7 @@ env:
 
 jobs:
   ios:
-    if: vars.NATIVE_RELEASES == 'on' && github.ref_name == 'swift'
+    if: github.ref_name == 'swift'
     runs-on: macos-26
     timeout-minutes: 45
     steps:
