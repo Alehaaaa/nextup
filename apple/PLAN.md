@@ -95,3 +95,39 @@ Reference: Cedar (cedartv.github.io/cedar-tv-updates), native Liquid Glass.
 - TMDB needs a read access token, supplied at build time through `TMDB_READ_ACCESS_TOKEN`
   (Info.plist key `NXTMDBToken`) or pasted in Settings.
 - Feature parity with `main` is the goal of the whole plan, not of phase 1.
+
+## Parity checklist (everything in the Flutter app)
+
+Status: ✅ in the native app · 🟡 partial · ⬜ not started. Android TV / tvOS-only parts are out of scope for iOS/macOS.
+
+**Discovery**
+- ✅ Home hero + rows, See All · 🟡 row styles (poster/wide/Top 10) · ⬜ branches editor (choose content + style, reorder, hide rows), Home page settings
+- ⬜ Collections (imported folder groups as Home rows) · ⬜ Discover page (metadata explore, filters, genres, layouts) · ⬜ Calendar (Trakt/airing)
+- ✅ Search (TMDB + addon catalogs, trending, ranked picks) · ⬜ keyword/torrent search, indexer managers (Prowlarr/Jackett), scraper engines
+- ✅ Title page · ⬜ cast/person pages, OMDb ratings, IMDb credits, parents guide, offline copy of title pages
+- 🟡 Reels (TMDB clips via Cobalt) · ⬜ direct YouTube extraction fallback, HD adaptive
+
+**Sources & playback**
+- ✅ Stremio addons (install, order, enable) · ⬜ addon hub / marketplace, addon auto-update, stream badges, saved source filters, Quick Play rules, source intent everywhere
+- 🟡 Debrid: ✅ Real-Debrid, TorBox · ⬜ AllDebrid, Premiumize, PikPak · ⬜ cloud file browsers per provider, torrent management, bulk add, magnet links
+- ✅ System player (PiP, AirPlay, track menus) · ⬜ MKV/HEVC/DTS engine (MPVKit/VLCKit), external subtitles, subtitle styling/priority, next-episode autoplay, play loader screen, external players settings
+- ⬜ Now Playing / lock screen metadata, media keys
+
+**Library & tracking**
+- 🟡 Continue Watching (local) · ⬜ merged across Trakt/Simkl/MDBList (furthest point wins), hide watched
+- 🟡 Trakt (sign-in, scrobble, paused, watchlist) · ⬜ history sync, lists, calendar, ratings · ⬜ Simkl · ⬜ MDBList
+- ✅ Favorites, Watchlist (device) · ⬜ synced with trackers
+- ⬜ `debrify://episode` / `nextup://` deep links (Up Next for Trakt)
+
+**Downloads**
+- 🟡 Background downloads, offline library, season download · ⬜ series scope, auto-download with saved filters (codec etc.), download settings, storage usage, posters with radial progress, offline artwork cache
+
+**Live & other sources**
+- ⬜ IPTV: M3U, Xtream Codes, XMLTV EPG, guide grid, categories/order/hidden, recordings, Stremio-as-IPTV
+- ⬜ Debrify TV (keyword channels), Stremio TV (random-play channels), community channels
+- ⬜ Media servers (Plex/Jellyfin/Emby) · ⬜ WebDAV browsing · ⬜ YouTube, Reddit, Lemmy video sources
+
+**Account & app**
+- 🟡 Settings (accounts, addons, Trakt) · ⬜ settings search, playback, metadata, looks/palettes, sidebar customisation
+- ⬜ Profiles · ⬜ Backup/restore (compatible with the Flutter export) · ⬜ WebDAV saved syncs with snapshots · ⬜ device-to-device transfer (LAN)
+- ⬜ Onboarding / initial setup · ⬜ in-app update check (native releases) · ⬜ launch animation · ⬜ localisation, accessibility pass
