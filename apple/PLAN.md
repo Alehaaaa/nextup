@@ -110,7 +110,7 @@ Status: ✅ in the native app · 🟡 partial · ⬜ not started. Android TV / t
 **Sources & playback**
 - ✅ Stremio addons (install, order, enable) · ⬜ addon hub / marketplace, addon auto-update, stream badges, saved source filters, Quick Play rules, source intent everywhere
 - 🟡 Debrid: ✅ Real-Debrid, TorBox · ⬜ AllDebrid, Premiumize, PikPak · ⬜ cloud file browsers per provider, torrent management, bulk add, magnet links
-- ✅ System player (PiP, AirPlay, track menus) · ⬜ MKV/HEVC/DTS engine (MPVKit/VLCKit), external subtitles, subtitle styling/priority, next-episode autoplay, play loader screen, external players settings
+- ✅ System player (PiP, AirPlay, track menus) · ✅ Skip Intro (SkipDB / TheIntroDB / IntroDB) · ✅ Up Next popup with countdown and autoplay · ⬜ MKV/HEVC/DTS engine (MPVKit/VLCKit), external subtitles, subtitle styling/priority, play loader screen, external players settings
 - ⬜ Now Playing / lock screen metadata, media keys
 
 **Library & tracking**

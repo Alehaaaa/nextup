@@ -87,3 +87,16 @@ final class ProgressTests: XCTestCase {
         XCTAssertNil(store.position(for: movie.id))
     }
 }
+
+final class SkipSegmentTests: XCTestCase {
+    func testBoundsAreValidated() {
+        let ok: [String: JSONValue] = ["start_ms": .number(30_000), "end_ms": .number(90_000)]
+        XCTAssertEqual(SkipSegmentsClient.bounded(ok, kind: .intro, duration: 2400),
+                       SkipSegment(kind: .intro, start: 30, end: 90))
+        let early: [String: JSONValue] = ["start_ms": .number(60_000), "end_ms": .number(120_000)]
+        XCTAssertNil(SkipSegmentsClient.bounded(early, kind: .outro, duration: 2400), "credits must be in the last 10%")
+        let openEnded: [String: JSONValue] = ["start_ms": .number(2_300_000), "end_ms": .null]
+        XCTAssertEqual(SkipSegmentsClient.bounded(openEnded, kind: .outro, duration: 2400, nullEndAtEnd: true)?.end, 2400)
+        XCTAssertNil(SkipSegmentsClient.bounded(ok, kind: .intro, duration: 0))
+    }
+}

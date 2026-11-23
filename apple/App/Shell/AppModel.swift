@@ -186,6 +186,41 @@ final class AppModel {
         return started
     }
 
+    // MARK: Next episode
+
+    /// The episode after this one: next in the season, else the first of the next season.
+    func nextEpisode(after item: MediaItem, season: Int, episode: Int) async -> Episode? {
+        if let list = await episodes(of: item, season: season), let next = list.first(where: { $0.number == episode + 1 }) {
+            return next
+        }
+        if let list = await episodes(of: item, season: season + 1), let first = list.min(by: { $0.number < $1.number }) {
+            return first
+        }
+        return nil
+    }
+
+    private func episodes(of item: MediaItem, season: Int) async -> [Episode]? {
+        if let tmdbID = item.tmdbID, tmdb.isConfigured {
+            return try? await tmdb.season(tmdbID: tmdbID, number: season)
+        }
+        guard let imdb = item.imdbID,
+              let meta = try? await addonClient.meta(from: addons, type: "series", id: imdb) else { return nil }
+        return meta.episodes.filter { $0.season == season }
+    }
+
+    /// A ready-to-play request for an episode: the downloaded file if there is one, else a source picked automatically.
+    func playbackRequest(for item: MediaItem, episode: Episode) async throws -> PlaybackRequest {
+        let key = "\(item.id):\(episode.season):\(episode.number)"
+        if let local = downloads.localURL(for: key) {
+            return PlaybackRequest(url: local, item: item, season: episode.season, episode: episode.number,
+                                   episodeTitle: episode.title, sourceLabel: "Downloaded")
+        }
+        let target = SourceTarget(item: item, season: episode.season, episode: episode.number, episodeTitle: episode.title)
+        let resolved = try await autoResolve(target)
+        return PlaybackRequest(url: resolved.url, item: item, season: episode.season, episode: episode.number,
+                               episodeTitle: episode.title, sourceLabel: nil)
+    }
+
     // MARK: Progress
 
     func continueWatching() -> [WatchProgress] {
