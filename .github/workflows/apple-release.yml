@@ -1,8 +1,7 @@
 name: Apple native release
 
 # Native (SwiftUI) counterpart of ios-commit.yml: builds the app in apple/ from
-# the `swift` branch, publishes a sideloadable IPA plus a Mac zip as a
-# pre-release, and updates a SideStore/AltStore source at:
+# the `swift` branch, publishes a sideloadable IPA as a pre-release, and updates a SideStore/AltStore source at:
 #   https://raw.githubusercontent.com/<owner>/<repo>/sidestore-native/apps.json
 #
 # OFF until the first native version is finished. Turn it on by setting the
@@ -37,8 +36,6 @@ jobs:
     if: vars.NATIVE_RELEASES == 'on' && github.ref_name == 'swift'
     runs-on: macos-26
     timeout-minutes: 45
-    outputs:
-      release_tag: ${{ steps.publish.outputs.release_tag }}
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
@@ -170,59 +167,9 @@ jobs:
           sleep $((attempt * 3))
         done
 
-        printf 'Native SwiftUI build of commit %s on %s.\n\n**iOS:** %s\n**macOS:** attached by the next job\n\n**SideStore source:** %s\n' \
+        printf 'Native SwiftUI build of commit %s on %s.\n\n**iOS:** %s\n\n**SideStore source:** %s\n' \
           "$GITHUB_SHA" "$GITHUB_REF_NAME" "$IPA_NAME" "$SOURCE_URL" > "$RUNNER_TEMP/notes.md"
         gh release edit "$RELEASE_TAG" --notes-file "$RUNNER_TEMP/notes.md"
 
         echo "### SideStore source" >> "$GITHUB_STEP_SUMMARY"
         echo "\`$SOURCE_URL\`" >> "$GITHUB_STEP_SUMMARY"
-
-  # The same commit's Mac app, attached to the release the iOS job published.
-  macos:
-    needs: ios
-    if: needs.ios.outputs.release_tag != ''
-    runs-on: macos-26
-    timeout-minutes: 45
-    env:
-      RELEASE_TAG: ${{ needs.ios.outputs.release_tag }}
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-
-    - name: Select newest Xcode
-      run: |
-        set -euo pipefail
-        XCODE=$(ls -d /Applications/Xcode_*.app | grep -vi beta | sort -V | tail -n 1)
-        echo "Using $XCODE"
-        sudo xcode-select -s "$XCODE/Contents/Developer"
-        xcodebuild -version
-
-    - name: Generate Xcode project
-      working-directory: apple
-      run: |
-        brew install xcodegen
-        xcodegen generate
-
-    - name: Build macOS app
-      working-directory: apple
-      env:
-        TMDB_READ_ACCESS_TOKEN: ${{ secrets.TMDB_READ_ACCESS_TOKEN }}
-      run: |
-        set -euo pipefail
-        xcodebuild -project Nextup.xcodeproj -scheme Nextup-macOS -configuration Release \
-          -destination 'generic/platform=macOS' -derivedDataPath build \
-          CODE_SIGN_IDENTITY="-" CODE_SIGN_STYLE=Manual DEVELOPMENT_TEAM="" \
-          CURRENT_PROJECT_VERSION="$(date -u +%Y%m%d%H%M)" \
-          TMDB_READ_ACCESS_TOKEN="${TMDB_READ_ACCESS_TOKEN}" \
-          build | tee build-macos.log | grep -E "error:|BUILD" || true
-        test -d build/Build/Products/Release/Nextup.app
-
-    - name: Package and publish
-      working-directory: apple/build/Build/Products/Release
-      env:
-        GH_TOKEN: ${{ github.token }}
-      run: |
-        set -euo pipefail
-        ZIP="nextup-${RELEASE_TAG}-macos.zip"
-        /usr/bin/ditto -c -k --sequesterRsrc --keepParent Nextup.app "$ZIP"
-        gh release upload "$RELEASE_TAG" "$ZIP" --clobber --repo "$GITHUB_REPOSITORY"
