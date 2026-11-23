@@ -55,7 +55,12 @@ Generate the Xcode project with `brew install xcodegen && cd apple && xcodegen`,
 
 Reference: Cedar (cedartv.github.io/cedar-tv-updates), native Liquid Glass.
 
-- Near-black ground (#08090B) so artwork carries the colour; Nextup violet as tint.
+- **Native only.** System controls, materials and colours throughout: `.glass` / `.glassProminent`
+  button styles, `GlassEffectContainer`, menus, pickers, forms, alerts, `ContentUnavailableView`,
+  the system tab bar / sidebar / toolbar tabs, and the system player (`AVPlayerViewController`
+  presented full screen on iPhone/iPad, `AVPlayerView` in a window on Mac) with its own PiP,
+  AirPlay and track menus. No hand-made glass, shadows or custom colours; the only brand touch is
+  the accent colour in the asset catalog.
 - Home: a full-bleed paging hero under the glass chrome (`backgroundExtensionEffect`) with a
   centered title, facts and a More chip; then rows ("branches") whose header opens the full list,
   in poster, wide (landscape) and Top 10 styles.

@@ -40,7 +40,6 @@ struct SearchView: View {
             }
         }
         .overlay(alignment: .top) { if isSearching { ProgressView().padding() } }
-        .nextupBackground()
         .navigationTitle("Search")
         .inlineTitle()
         .toolbar { SettingsToolbarItem() }
@@ -71,9 +70,7 @@ struct SearchView: View {
                             if index < picks.count - 1 { Divider().padding(.leading, 64) }
                         }
                     }
-                    .padding(.vertical, 6)
-                    .glassCard(cornerRadius: 22)
-                    .padding(.horizontal, Theme.gutter)
+                    .padding(.horizontal, Theme.gutter - 14)
                 }
             }
             if !trendingMovies.isEmpty {

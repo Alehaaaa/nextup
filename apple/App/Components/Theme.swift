@@ -5,16 +5,18 @@ import UIKit
 import AppKit
 #endif
 
-/// Cinematic dark look: near-black ground so artwork carries the colour, Liquid Glass for chrome,
-/// Nextup's violet as the tint.
+/// Layout constants only. Colours, materials and controls are the system's: the app sets the
+/// accent colour (asset catalog) and dark appearance, and every surface is native.
 enum Theme {
-    static let background = Color(red: 0x08 / 255, green: 0x09 / 255, blue: 0x0B / 255)
-    static let surface = Color(red: 0x16 / 255, green: 0x13 / 255, blue: 0x1F / 255)
-    static let accent = Color(red: 0x7B / 255, green: 0x5C / 255, blue: 0xFF / 255)
-    static let focus = Color(red: 0xFB / 255, green: 0xBF / 255, blue: 0x24 / 255)
-    static let success = Color(red: 0x10 / 255, green: 0xB9 / 255, blue: 0x81 / 255)
-    static let danger = Color(red: 0xEF / 255, green: 0x44 / 255, blue: 0x44 / 255)
-    static let placeholder = Color(red: 0x11 / 255, green: 0x11 / 255, blue: 0x18 / 255)
+    /// The platform's own window background, used where artwork fades into the page.
+    static var background: Color {
+        #if os(macOS)
+        Color(nsColor: .windowBackgroundColor)
+        #else
+        Color(uiColor: .systemBackground)
+        #endif
+    }
+    static let accent = Color.accentColor
 
     static let posterAspect: CGFloat = 2.0 / 3.0
     static let corner: CGFloat = 14
@@ -49,16 +51,6 @@ enum Theme {
 }
 
 extension View {
-    /// The app's background, edge to edge.
-    func nextupBackground() -> some View {
-        background(Theme.background.ignoresSafeArea())
-    }
-
-    /// Liquid Glass panel for cards and controls that float over content.
-    func glassCard(cornerRadius: CGFloat = 18) -> some View {
-        glassEffect(.regular, in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
-    }
-
     /// Inline navigation title on iOS; no-op on the Mac, which has no title display modes.
     @ViewBuilder
     func inlineTitle() -> some View {

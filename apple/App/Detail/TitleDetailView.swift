@@ -40,7 +40,6 @@ struct TitleDetailView: View {
         }
         .scrollEdgeEffectStyle(.soft, for: .top)
         .ignoresSafeArea(edges: .top)
-        .nextupBackground()
         .navigationTitle(item.title)
         .inlineTitle()
         #if os(iOS)
@@ -75,17 +74,17 @@ struct TitleDetailView: View {
             ], startPoint: .top, endPoint: .bottom)
             VStack(spacing: 10) {
                 Text(item.title)
-                    .font(.system(size: isCompact ? 34 : 30, weight: .bold))
+                    .font(isCompact ? .largeTitle.bold() : .title.bold())
                     .multilineTextAlignment(.center)
                     .lineLimit(3)
                     .minimumScaleFactor(0.7)
                 if !facts.isEmpty {
-                    Text(facts).font(.subheadline.weight(.medium)).foregroundStyle(.white.opacity(0.85))
+                    Text(facts).font(.subheadline.weight(.medium))
                 }
                 if !item.overview.isEmpty {
                     Text(item.overview)
                         .font(.subheadline)
-                        .foregroundStyle(.white.opacity(0.55))
+                        .foregroundStyle(.secondary)
                         .multilineTextAlignment(.center)
                         .lineLimit(isCompact ? 3 : 2)
                         .frame(maxWidth: 720)
@@ -129,45 +128,45 @@ struct TitleDetailView: View {
         model.continueWatching().first { $0.id == item.id }
     }
 
-    /// iPhone: a wide white Resume button and round glass buttons. Mac/iPad: a centered row of capsules.
+    /// System glass buttons: a prominent Resume, then Random / Favorite / Watchlist
+    /// (round icon buttons on iPhone, labelled buttons on iPad and Mac).
     private var actions: some View {
-        GlassEffectContainer(spacing: 10) {
+        GlassEffectContainer {
             HStack(spacing: 10) {
                 Button { playPrimary() } label: {
-                    HStack(spacing: 8) {
+                    Label {
+                        Text(primaryLabel.title) + Text(primaryLabel.code.map { "  \($0)" } ?? "").foregroundStyle(.secondary)
+                    } icon: {
                         Image(systemName: "play.fill")
-                        Text(primaryLabel.title).fontWeight(.semibold)
-                        if let code = primaryLabel.code { Text(code).foregroundStyle(.black.opacity(0.45)) }
                     }
                     .frame(maxWidth: isCompact ? .infinity : nil)
                 }
-                .buttonStyle(PrimaryCapsuleStyle(large: isCompact))
+                .buttonStyle(.glassProminent)
                 .disabled(item.imdbID == nil)
 
                 if item.kind == .series {
-                    actionButton("Random", symbol: "dice", active: false) { playRandom() }
+                    actionButton("Random", symbol: "dice") { playRandom() }
                         .disabled(episodes.isEmpty)
                 }
-                actionButton("Favorite", symbol: model.isFavorite(item) ? "heart.fill" : "heart", active: model.isFavorite(item)) {
+                actionButton("Favorite", symbol: model.isFavorite(item) ? "heart.fill" : "heart") {
                     model.toggleFavorite(item)
                 }
-                actionButton("Watchlist", symbol: model.isOnWatchlist(item) ? "bookmark.fill" : "bookmark", active: model.isOnWatchlist(item)) {
+                actionButton("Watchlist", symbol: model.isOnWatchlist(item) ? "bookmark.fill" : "bookmark") {
                     model.toggleWatchlist(item)
                 }
             }
+            .controlSize(isCompact ? .extraLarge : .regular)
         }
         .frame(maxWidth: .infinity, alignment: .center)
     }
 
     @ViewBuilder
-    private func actionButton(_ title: String, symbol: String, active: Bool, action: @escaping () -> Void) -> some View {
+    private func actionButton(_ title: String, symbol: String, action: @escaping () -> Void) -> some View {
         if isCompact {
-            Button(action: action) {
-                Image(systemName: symbol).font(.title3).frame(width: 52, height: 52)
-            }
-            .buttonStyle(.plain)
-            .glassEffect(.regular.interactive(), in: Circle())
-            .accessibilityLabel(title)
+            Button(action: action) { Label(title, systemImage: symbol) }
+                .labelStyle(.iconOnly)
+                .buttonStyle(.glass)
+                .buttonBorderShape(.circle)
         } else {
             Button(action: action) { Label(title, systemImage: symbol) }
                 .buttonStyle(.glass)
@@ -239,25 +238,15 @@ struct TitleDetailView: View {
 
     @ViewBuilder
     private var seasonMenu: some View {
-        let title = HStack(spacing: 6) {
-            Text("Season \(season)")
-            Image(systemName: "chevron.up.chevron.down").font(.caption.weight(.bold)).foregroundStyle(.secondary)
-        }
-        .font(isCompact ? .title3.weight(.bold) : .subheadline.weight(.semibold))
-
         if seasonNumbers.count > 1 {
-            Menu {
-                Picker("Season", selection: $season) {
-                    ForEach(seasonNumbers, id: \.self) { Text("Season \($0)").tag($0) }
-                }
-            } label: {
-                if isCompact { title } else { title.padding(.horizontal, 14).padding(.vertical, 7).glassEffect(.regular, in: Capsule()) }
+            Picker("Season", selection: $season) {
+                ForEach(seasonNumbers, id: \.self) { Text("Season \($0)").tag($0) }
             }
-            .menuStyle(.button)
-            .buttonStyle(.plain)
+            .pickerStyle(.menu)
+            .labelsHidden()
             .fixedSize()
         } else {
-            Text("Season \(season)").font(isCompact ? .title3.weight(.bold) : .subheadline.weight(.semibold))
+            Text("Season \(season)").font(.headline)
         }
     }
 
@@ -344,23 +333,6 @@ struct TitleDetailView: View {
     }
 }
 
-/// The white capsule used for Resume / Play.
-private struct PrimaryCapsuleStyle: ButtonStyle {
-    let large: Bool
-    @Environment(\.isEnabled) private var isEnabled
-
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .font(large ? .title3 : .subheadline)
-            .foregroundStyle(.black)
-            .padding(.horizontal, large ? 24 : 16)
-            .frame(height: large ? 52 : 32)
-            .background(.white.opacity(isEnabled ? 1 : 0.5), in: Capsule())
-            .scaleEffect(configuration.isPressed ? 0.97 : 1)
-            .animation(.snappy, value: configuration.isPressed)
-    }
-}
-
 /// A landscape card in the episode rail: still, progress, "E1 • Title", runtime.
 private struct EpisodeCard: View {
     let episode: Episode
@@ -373,14 +345,8 @@ private struct EpisodeCard: View {
                 .frame(width: width, height: width * 9 / 16)
                 .overlay(alignment: .bottom) {
                     if let progress, progress > 0 {
-                        GeometryReader { geo in
-                            ZStack(alignment: .leading) {
-                                Capsule().fill(.white.opacity(0.3))
-                                Capsule().fill(Theme.accent).frame(width: max(4, geo.size.width * progress))
-                            }
-                        }
-                        .frame(height: 4)
-                        .padding(.horizontal, 10).padding(.bottom, 10)
+                        ProgressView(value: progress)
+                            .padding(.horizontal, 10).padding(.bottom, 10)
                     }
                 }
                 .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))

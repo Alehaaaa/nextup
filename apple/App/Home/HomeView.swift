@@ -51,7 +51,6 @@ struct HomeView: View {
         .scrollEdgeEffectStyle(.soft, for: .top)
         .ignoresSafeArea(edges: heroes.isEmpty ? [] : .top)
         .overlay { if isLoading && rails.isEmpty { ProgressView().controlSize(.large) } }
-        .nextupBackground()
         .navigationTitle("Home")
         .toolbar(removing: .title)
         .toolbar { SettingsToolbarItem() }
@@ -181,27 +180,11 @@ private struct HeroCarousel: View {
         .scrollTargetBehavior(.paging)
         .scrollPosition(id: $page)
         .frame(height: HeroPage.height)
-        .overlay(alignment: .bottom) {
-            if items.count > 1 {
-                HStack(spacing: 6) {
-                    ForEach(items) { item in
-                        Capsule()
-                            .fill(.white.opacity((page ?? items.first?.id) == item.id ? 0.95 : 0.35))
-                            .frame(width: (page ?? items.first?.id) == item.id ? 18 : 6, height: 6)
-                    }
-                }
-                .padding(.horizontal, 10).padding(.vertical, 7)
-                .glassEffect(.regular, in: Capsule())
-                .padding(.bottom, 10)
-                .animation(.snappy, value: page)
-            }
-        }
     }
 }
 
 private struct HeroPage: View {
     let item: MediaItem
-    @Environment(\.isCompactWidth) private var isCompact
 
     static var height: CGFloat {
         #if os(macOS)
@@ -212,8 +195,7 @@ private struct HeroPage: View {
     }
 
     var body: some View {
-        NavigationLink(value: item) {
-            ZStack(alignment: .bottom) {
+        ZStack(alignment: .bottom) {
                 ArtworkImage(url: item.backdropURL)
                     .frame(maxWidth: .infinity)
                     .frame(height: Self.height)
@@ -227,36 +209,25 @@ private struct HeroPage: View {
                 // Centered, title-card style, like a TV app's featured slot.
                 VStack(spacing: 12) {
                     Text(item.title)
-                        .font(.system(size: isCompact ? 34 : 52, weight: .regular, design: .serif))
-                        .tracking(isCompact ? 2 : 4)
-                        .textCase(.uppercase)
+                        .font(.largeTitle.bold())
                         .multilineTextAlignment(.center)
                         .lineLimit(2)
                         .minimumScaleFactor(0.6)
-                        .shadow(color: .black.opacity(0.5), radius: 12)
                     HeroFacts(item: item)
                     if !item.overview.isEmpty {
-                        HStack(alignment: .lastTextBaseline, spacing: 8) {
-                            Text(item.overview)
-                                .font(.subheadline)
-                                .foregroundStyle(.white.opacity(0.7))
-                                .lineLimit(2)
-                                .multilineTextAlignment(isCompact ? .leading : .center)
-                            if isCompact {
-                                Text("More")
-                                    .font(.subheadline.weight(.semibold))
-                                    .padding(.horizontal, 12).padding(.vertical, 5)
-                                    .glassEffect(.regular, in: Capsule())
-                            }
-                        }
-                        .frame(maxWidth: 720)
+                        Text(item.overview)
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(2)
+                            .multilineTextAlignment(.center)
+                            .frame(maxWidth: 720)
                     }
+                    NavigationLink("More", value: item)
+                        .buttonStyle(.glass)
                 }
                 .padding(.horizontal, Theme.gutter)
-                .padding(.bottom, 44)
-            }
+                .padding(.bottom, 32)
         }
-        .buttonStyle(.plain)
     }
 }
 
@@ -268,12 +239,10 @@ private struct HeroFacts: View {
             if let year = item.year { Text(String(year)) }
             if item.year != nil, item.rating != nil { Text("·").foregroundStyle(.secondary) }
             if let rating = item.rating { Label(String(format: "%.1f", rating), systemImage: "star.fill").labelStyle(.titleAndIcon) }
+            Text("·").foregroundStyle(.secondary)
             Text(item.kind == .movie ? "Movie" : "Series")
-                .padding(.horizontal, 10).padding(.vertical, 3)
-                .glassEffect(.regular, in: Capsule())
         }
         .font(.subheadline.weight(.medium))
-        .foregroundStyle(.white.opacity(0.9))
     }
 }
 
@@ -281,19 +250,25 @@ private struct GetStartedCard: View {
     var error: String?
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Label("Set up Nextup", systemImage: "sparkles").font(.headline)
+        ContentUnavailableView {
+            Label("Set up Nextup", systemImage: "sparkles")
+        } description: {
             Text(error ?? "Add a TMDB token for Home rows and search, install addons for catalogs and streams, and connect Real-Debrid or TorBox to play.")
-                .foregroundStyle(.secondary)
+        } actions: {
             #if os(macOS)
             SettingsLink { Text("Open Settings") }
-                .buttonStyle(.glassProminent)
             #else
-            Text("Open the Settings tab to get started.").font(.footnote).foregroundStyle(.secondary)
+            SettingsButton()
             #endif
         }
-        .padding(20)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .glassCard()
     }
 }
+
+#if !os(macOS)
+private struct SettingsButton: View {
+    @Environment(AppModel.self) private var model
+    var body: some View {
+        Button("Open Settings") { model.showingSettings = true }
+    }
+}
+#endif

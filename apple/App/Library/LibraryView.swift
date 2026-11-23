@@ -82,7 +82,6 @@ struct LibraryView: View {
             .padding(.horizontal, Theme.gutter)
             .padding(.vertical)
         }
-        .nextupBackground()
         .navigationTitle("Library")
         .toolbar { SettingsToolbarItem() }
         .refreshable { await loadTrakt() }
@@ -150,8 +149,7 @@ private struct TraktRow: View {
             Spacer()
             Image(systemName: "chevron.right").foregroundStyle(.tertiary)
         }
-        .padding(12)
-        .glassCard(cornerRadius: 12)
+        .padding(.vertical, 8)
         .contentShape(Rectangle())
     }
 }

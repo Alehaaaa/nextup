@@ -27,8 +27,6 @@ struct SettingsView: View {
             AboutSection()
         }
         .formStyle(.grouped)
-        .scrollContentBackground(.hidden)
-        .nextupBackground()
         .navigationTitle("Settings")
         #endif
     }
@@ -147,7 +145,7 @@ private struct TraktSection: View {
     var body: some View {
         Section {
             if signedIn {
-                Label("Connected to Trakt", systemImage: "checkmark.circle.fill").foregroundStyle(Theme.success)
+                Label("Connected to Trakt", systemImage: "checkmark.circle.fill").foregroundStyle(.green)
                 Button("Sign out", role: .destructive) {
                     model.trakt.signOut()
                     model.accountsChanged()

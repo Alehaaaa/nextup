@@ -27,8 +27,8 @@ final class AppModel {
     /// Bumped when an account or token changes.
     private(set) var accountsRevision = 0
 
-    /// iPhone/iPad present the player full screen from here; the Mac opens a window instead.
-    var activePlayback: PlaybackRequest?
+    /// A stream the system player could not open; Root shows a system alert offering other players.
+    var playbackFailure: PlaybackFailure?
 
     init(secrets: SecretStoring = KeychainSecretStore(), defaults: DefaultsStore = DefaultsStore()) {
         self.secrets = secrets

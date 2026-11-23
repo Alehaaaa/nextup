@@ -72,7 +72,7 @@ struct SourcesView: View {
             } else {
                 List {
                     if let error {
-                        Label(error, systemImage: "exclamationmark.triangle.fill").foregroundStyle(Theme.danger)
+                        Label(error, systemImage: "exclamationmark.triangle.fill").foregroundStyle(.red)
                     }
                     if model.activeDebrid == nil, lookup.streams.contains(where: { $0.infoHash != nil }) {
                         Label("Connect Real-Debrid or TorBox in Settings to play torrent sources.", systemImage: "info.circle")
@@ -164,9 +164,8 @@ private struct StreamRow: View {
         HStack(alignment: .top, spacing: 12) {
             Text(stream.quality.label)
                 .font(.caption.weight(.bold))
-                .padding(.horizontal, 8).padding(.vertical, 4)
-                .glassEffect(.regular.tint(Theme.accent.opacity(0.6)), in: Capsule())
-                .frame(width: 56)
+                .foregroundStyle(.tint)
+                .frame(width: 44, alignment: .leading)
             VStack(alignment: .leading, spacing: 4) {
                 Text(stream.headline.replacingOccurrences(of: "\n", with: " "))
                     .font(.subheadline.weight(.semibold)).lineLimit(2)

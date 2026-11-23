@@ -32,6 +32,7 @@ struct RootView: View {
     #if os(macOS)
     @Environment(\.openWindow) private var openWindow
     #endif
+    @Environment(\.openURL) private var openURL
     @State private var selection: AppSection = .home
 
     var body: some View {
@@ -69,9 +70,16 @@ struct RootView: View {
         #if os(macOS)
         .focusedSceneValue(\.sectionSelection, $selection)
         #else
-        .fullScreenCover(item: Binding(get: { model.activePlayback }, set: { model.activePlayback = $0 })) { request in
-            PlayerView(request: request)
-                .environment(model)
+        .alert("Can't play this stream",
+               isPresented: Binding(get: { model.playbackFailure != nil }, set: { if !$0 { model.playbackFailure = nil } }),
+               presenting: model.playbackFailure) { failure in
+            ForEach(ExternalPlayer.options(for: failure.request.url)) { option in
+                Button("Open in \(option.name)") { openURL(option.url) }
+            }
+            Button("Copy Link") { Clipboard.copy(failure.request.url.absoluteString) }
+            Button("Close", role: .cancel) {}
+        } message: { failure in
+            Text(failure.message)
         }
         #endif
     }
@@ -138,7 +146,7 @@ struct PlayAction {
         #if os(macOS)
         openWindow(value: request)
         #else
-        model.activePlayback = request
+        NativePlayer.present(request, model: model)
         #endif
     }
 }

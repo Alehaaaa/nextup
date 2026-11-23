@@ -11,9 +11,9 @@ struct ArtworkImage: View {
             case .success(let image):
                 image.resizable().aspectRatio(contentMode: contentMode)
             case .failure:
-                Theme.placeholder.overlay(Image(systemName: "film").foregroundStyle(.secondary))
+                Rectangle().fill(.quaternary).overlay(Image(systemName: "film").foregroundStyle(.secondary))
             default:
-                Theme.placeholder
+                Rectangle().fill(.quaternary)
             }
         }
     }
@@ -26,29 +26,9 @@ enum RailStyle: Hashable {
     case top10
 }
 
-private struct ProgressBar: View {
-    let value: Double
-
-    var body: some View {
-        GeometryReader { geo in
-            ZStack(alignment: .leading) {
-                Capsule().fill(.white.opacity(0.25))
-                Capsule().fill(.white).frame(width: max(4, geo.size.width * value))
-            }
-        }
-        .frame(height: 4)
-    }
-}
-
 private struct CardShape: ViewModifier {
     func body(content: Content) -> some View {
-        content
-            .clipShape(RoundedRectangle(cornerRadius: Theme.corner, style: .continuous))
-            .overlay {
-                RoundedRectangle(cornerRadius: Theme.corner, style: .continuous)
-                    .strokeBorder(.white.opacity(0.08))
-            }
-            .shadow(color: .black.opacity(0.45), radius: 10, y: 6)
+        content.clipShape(RoundedRectangle(cornerRadius: Theme.corner, style: .continuous))
     }
 }
 
@@ -65,7 +45,7 @@ struct PosterCard: View {
             ArtworkImage(url: item.posterURL)
                 .frame(width: width, height: width / Theme.posterAspect)
                 .overlay(alignment: .bottom) {
-                    if let progress, progress > 0 { ProgressBar(value: progress).padding(10) }
+                    if let progress, progress > 0 { ProgressView(value: progress).padding(10) }
                 }
                 .modifier(CardShape())
             VStack(alignment: .leading, spacing: 2) {
@@ -97,7 +77,7 @@ struct WideCard: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(item.title).font(.subheadline.weight(.bold)).lineLimit(1)
                     if let caption { Text(caption).font(.caption).foregroundStyle(.white.opacity(0.75)).lineLimit(1) }
-                    if let progress, progress > 0 { ProgressBar(value: progress).padding(.top, 2) }
+                    if let progress, progress > 0 { ProgressView(value: progress).padding(.top, 2) }
                 }
                 .padding(12)
             }
@@ -116,14 +96,8 @@ struct Top10Card: View {
         let width = Theme.railPosterWidth
         return HStack(alignment: .bottom, spacing: -width * 0.18) {
             Text("\(rank)")
-                .font(.system(size: width * 0.95, weight: .black, design: .rounded))
-                .foregroundStyle(.clear)
-                .overlay {
-                    Text("\(rank)")
-                        .font(.system(size: width * 0.95, weight: .black, design: .rounded))
-                        .foregroundStyle(LinearGradient(colors: [.white.opacity(0.9), .white.opacity(0.15)],
-                                                        startPoint: .top, endPoint: .bottom))
-                }
+                .font(.system(size: width * 0.95, weight: .heavy, design: .rounded))
+                .foregroundStyle(.secondary)
                 .offset(y: width * 0.12)
             ArtworkImage(url: item.posterURL)
                 .frame(width: width, height: width / Theme.posterAspect)
@@ -164,7 +138,6 @@ struct PosterRail<Item: Identifiable, Card: View>: View {
                     ForEach(items) { item in card(item) }
                 }
                 .padding(.horizontal, Theme.gutter)
-                .padding(.bottom, 12) // room for card shadows
                 .scrollTargetLayout()
             }
             .scrollClipDisabled()
@@ -209,7 +182,6 @@ struct SeeAllView: View {
             .padding(.horizontal, Theme.gutter)
             .padding(.vertical)
         }
-        .nextupBackground()
         .navigationTitle(rail.title)
         .inlineTitle()
     }
