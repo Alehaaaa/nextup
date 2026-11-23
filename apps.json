@@ -3,7 +3,7 @@
   "identifier": "io.github.alehaaaa.nextup.native.commits",
   "subtitle": "The native SwiftUI Nextup for iPhone and iPad, built from every commit.",
   "description": "Nextup is an independent, unofficial fork of Debrify with a Reels feed, Continue Watching synced across Trakt, Simkl and MDBList, offline-first downloads and a reworked glass interface.\n\nEvery commit to swift in Alehaaaa/nextup is built automatically and published here with a changelog of what changed since the previous build, so updates show up right in SideStore or AltStore. The source keeps the last few builds, so you can always roll back.\n\nNot affiliated with or endorsed by the official Debrify project.",
-  "iconURL": "https://raw.githubusercontent.com/Alehaaaa/nextup/0bc24aeb7662739dd67a40e56275eebdf34b8e3c/assets/icon/app_icon_flat.png",
+  "iconURL": "https://raw.githubusercontent.com/Alehaaaa/nextup/d3363426d92517424bd1f180852692f23d2b3cf7/assets/icon/app_icon_flat.png",
   "website": "https://github.com/Alehaaaa/nextup",
   "tintColor": "#7C4DFF",
   "featuredApps": [
@@ -16,11 +16,20 @@
       "developerName": "Alehaaaa",
       "subtitle": "Native beta of Nextup for iPhone and iPad.",
       "localizedDescription": "A native SwiftUI rebuild of Nextup, shared with the Mac app. It is in early development and does not yet have every feature of the main app.\n\n• TMDB home rows, search and title pages\n• Stremio addons for catalogs and streams\n• Real-Debrid and TorBox playback\n• Trakt sign-in, scrobbling, paused items and watchlist\n• Continue Watching on this device\n\nNextup doesn't host or provide any content; you connect the services you already use.\n\nThese are untested builds of every commit, made by GitHub Actions. SideStore or AltStore re-signs them with your own certificate on install. Nextup is an independent fork of Debrify and isn't affiliated with the official project.",
-      "iconURL": "https://raw.githubusercontent.com/Alehaaaa/nextup/0bc24aeb7662739dd67a40e56275eebdf34b8e3c/assets/icon/app_icon_flat.png",
+      "iconURL": "https://raw.githubusercontent.com/Alehaaaa/nextup/d3363426d92517424bd1f180852692f23d2b3cf7/assets/icon/app_icon_flat.png",
       "tintColor": "#7C4DFF",
       "category": "entertainment",
       "screenshots": {},
       "versions": [
+        {
+          "version": "0.1.0",
+          "buildVersion": "202611231118",
+          "date": "2026-11-23T11:21:00Z",
+          "localizedDescription": "What's new:\n• Fix sync test MediaItem argument order (d3363426)\n\nBuild 202611231118 from swift@d336342\nhttps://github.com/Alehaaaa/nextup/compare/0bc24ae...d336342",
+          "downloadURL": "https://github.com/Alehaaaa/nextup/releases/download/native-build-10-d336342/nextup-native-ios-10-d336342.ipa",
+          "size": 2337630,
+          "minOSVersion": "26.0"
+        },
         {
           "version": "0.1.0",
           "buildVersion": "202611231116",
