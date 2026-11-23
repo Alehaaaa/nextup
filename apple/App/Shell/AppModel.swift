@@ -13,13 +13,13 @@ final class AppModel {
     let trakt: TraktClient
     let downloads: DownloadManager
 
-    var addons: [InstalledAddon] { didSet { defaults.save(addons, key: Keys.addons) } }
+    var addons: [InstalledAddon] { didSet { defaults.save(addons, key: Keys.addons); settingsChanged() } }
     var preferredDebrid: DebridService? {
         didSet { defaults.defaults.set(preferredDebrid?.rawValue, forKey: Keys.preferredDebrid) }
     }
     /// Saved on this device; shown in Library.
-    var favorites: [MediaItem] { didSet { defaults.save(favorites, key: Keys.favorites) } }
-    var watchlist: [MediaItem] { didSet { defaults.save(watchlist, key: Keys.watchlist) } }
+    var favorites: [MediaItem] { didSet { defaults.save(favorites, key: Keys.favorites); settingsChanged() } }
+    var watchlist: [MediaItem] { didSet { defaults.save(watchlist, key: Keys.watchlist); settingsChanged() } }
     /// iPhone/iPad open Settings as a sheet from the gear button; the Mac uses its Settings window.
     var showingSettings = false
 
@@ -49,6 +49,44 @@ final class AppModel {
         static let preferredDebrid = "nextup.preferredDebrid"
         static let favorites = "nextup.favorites.v1"
         static let watchlist = "nextup.watchlist.v1"
+        static let settingsChangedAt = "nextup.settingsChangedAt"
+    }
+
+    // MARK: Sync
+
+    /// Set while a synced state is applied, so applying it does not count as a new local change.
+    private var applyingSync = false
+
+    private func settingsChanged() {
+        guard !applyingSync else { return }
+        defaults.defaults.set(Date().timeIntervalSinceReferenceDate, forKey: Keys.settingsChangedAt)
+    }
+
+    func syncState() -> SyncState {
+        var values: [String: String] = [:]
+        for key in SecretKey.synced { if let value = secrets.string(for: key), !value.isEmpty { values[key] = value } }
+        return SyncState(settingsChangedAt: Date(timeIntervalSinceReferenceDate: defaults.defaults.double(forKey: Keys.settingsChangedAt)),
+                         addons: addons, favorites: favorites, watchlist: watchlist,
+                         secrets: values, progress: progress.all())
+    }
+
+    func apply(_ state: SyncState) {
+        applyingSync = true
+        defer { applyingSync = false }
+        if addons != state.addons { addons = state.addons }
+        if favorites != state.favorites { favorites = state.favorites }
+        if watchlist != state.watchlist { watchlist = state.watchlist }
+        for key in SecretKey.synced where secrets.string(for: key) != state.secrets[key] {
+            // Trakt rotates refresh tokens: never replace a session with an older one.
+            if key == SecretKey.traktSession, let local = trakt.session,
+               let remote = state.secrets[key].flatMap({ try? JSONDecoder().decode(TraktSession.self, from: Data($0.utf8)) }),
+               local.expiresAt > remote.expiresAt { continue }
+            secrets.set(state.secrets[key], for: key)
+        }
+        defaults.defaults.set(state.settingsChangedAt.timeIntervalSinceReferenceDate, forKey: Keys.settingsChangedAt)
+        progress.replaceAll(state.progress)
+        progressRevision += 1
+        accountsRevision += 1
     }
 
     // MARK: Metadata
@@ -70,11 +108,14 @@ final class AppModel {
 
     func setSecret(_ value: String?, for key: String) {
         secrets.set(value?.trimmingCharacters(in: .whitespacesAndNewlines), for: key)
-        accountsRevision += 1
+        accountsChanged()
     }
 
     /// Tells screens that depend on accounts (Home, Library) to reload.
-    func accountsChanged() { accountsRevision += 1 }
+    func accountsChanged() {
+        accountsRevision += 1
+        settingsChanged()
+    }
 
     func secret(_ key: String) -> String { secrets.string(for: key) ?? "" }
 

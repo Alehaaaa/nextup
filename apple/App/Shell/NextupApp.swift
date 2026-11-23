@@ -24,15 +24,29 @@ extension Notification.Name {
 
 @main
 struct NextupApp: App {
-    @State private var model = AppModel()
+    @State private var model: AppModel
+    @State private var sync: SyncController
+    @Environment(\.scenePhase) private var scenePhase
     #if os(iOS)
     @UIApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     #endif
+
+    init() {
+        let model = AppModel()
+        _model = State(initialValue: model)
+        _sync = State(initialValue: SyncController(model: model))
+    }
 
     var body: some Scene {
         WindowGroup {
             RootView()
                 .environment(model)
+                .environment(sync)
+                // Sync when the app opens, comes back, or goes away.
+                .task { await sync.syncNow() }
+                .onChange(of: scenePhase) { _, phase in
+                    if phase != .inactive { Task { await sync.syncNow() } }
+                }
                 #if os(iOS)
                 .onReceive(NotificationCenter.default.publisher(for: .nextupBackgroundSessionEvents)) { _ in
                     model.downloads.backgroundCompletion = AppDelegate.pendingBackgroundCompletion
@@ -66,8 +80,9 @@ struct NextupApp: App {
         .defaultSize(width: 1280, height: 720)
 
         Settings {
-            SettingsView()
+            NavigationStack { SettingsView() }
                 .environment(model)
+                .environment(sync)
                 .frame(minWidth: 560, minHeight: 520)
                 .preferredColorScheme(.dark)
                 .tint(Theme.accent)

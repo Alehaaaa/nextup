@@ -1,34 +1,59 @@
 import SwiftUI
 import NextupKit
 
+/// Kept short on purpose: three groups on one page, each opening its own small page.
+/// The same view on iPhone, iPad and in the Mac Settings window.
 struct SettingsView: View {
     @Environment(AppModel.self) private var model
+    @Environment(SyncController.self) private var sync
 
     var body: some View {
-        #if os(macOS)
-        // The Mac Settings window uses tabs, like other Mac apps.
-        TabView {
-            Form { MetadataSection(); DebridSection() }.formStyle(.grouped)
-                .tabItem { Label("Accounts", systemImage: "person.crop.circle") }
-            Form { TraktSection() }.formStyle(.grouped)
-                .tabItem { Label("Tracking", systemImage: "chart.line.uptrend.xyaxis") }
-            Form { AddonsSection() }.formStyle(.grouped)
-                .tabItem { Label("Addons", systemImage: "puzzlepiece.extension") }
-            Form { AboutSection() }.formStyle(.grouped)
-                .tabItem { Label("About", systemImage: "info.circle") }
-        }
-        .padding()
-        #else
+        @Bindable var model = model
+        let _ = model.accountsRevision
         Form {
-            MetadataSection()
-            DebridSection()
-            TraktSection()
-            AddonsSection()
+            Section("Accounts") {
+                ForEach(DebridService.allCases) { service in
+                    NavigationLink {
+                        Form { DebridAccountRow(service: service) }.formStyle(.grouped).navigationTitle(service.displayName)
+                    } label: {
+                        LabeledContent(service.displayName, value: model.secret(service.secretKey).isEmpty ? "Not set" : "Connected")
+                    }
+                }
+                NavigationLink {
+                    Form { TraktSection() }.formStyle(.grouped).navigationTitle("Trakt")
+                } label: {
+                    LabeledContent("Trakt", value: model.trakt.isSignedIn ? "Connected" : "Not set")
+                }
+                NavigationLink {
+                    Form { MetadataSection() }.formStyle(.grouped).navigationTitle("TMDB")
+                } label: {
+                    LabeledContent("TMDB", value: model.hasTMDB ? "Connected" : "Not set")
+                }
+                if model.configuredDebrid.count > 1 {
+                    Picker("Play torrents with", selection: $model.preferredDebrid) {
+                        Text("Automatic").tag(DebridService?.none)
+                        ForEach(model.configuredDebrid) { Text($0.displayName).tag(DebridService?.some($0)) }
+                    }
+                }
+            }
+
+            Section {
+                NavigationLink {
+                    Form { AddonsSection() }.formStyle(.grouped).navigationTitle("Addons")
+                } label: {
+                    LabeledContent("Addons", value: "\(model.addons.filter(\.enabled).count) on")
+                }
+                NavigationLink {
+                    SyncSettingsView()
+                } label: {
+                    LabeledContent("Sync", value: sync.isConnected ? sync.account.preset.displayName : "Off")
+                }
+            }
+
             AboutSection()
         }
         .formStyle(.grouped)
         .navigationTitle("Settings")
-        #endif
     }
 }
 
@@ -60,29 +85,6 @@ private struct MetadataSection: View {
 }
 
 // MARK: Debrid
-
-private struct DebridSection: View {
-    @Environment(AppModel.self) private var model
-
-    var body: some View {
-        @Bindable var model = model
-        Section {
-            ForEach(DebridService.allCases) { service in
-                DebridAccountRow(service: service)
-            }
-            if model.configuredDebrid.count > 1 {
-                Picker("Play torrents with", selection: $model.preferredDebrid) {
-                    Text("Automatic").tag(DebridService?.none)
-                    ForEach(model.configuredDebrid) { Text($0.displayName).tag(DebridService?.some($0)) }
-                }
-            }
-        } header: {
-            Text("Debrid services")
-        } footer: {
-            Text("Keys are stored in the Keychain on this device.")
-        }
-    }
-}
 
 private struct DebridAccountRow: View {
     @Environment(AppModel.self) private var model

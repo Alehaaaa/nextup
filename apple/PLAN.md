@@ -31,6 +31,7 @@ apple/
     Debrid/                   Real-Debrid, TorBox (AllDebrid, Premiumize, PikPak later)
     Tracking/                 Trakt (device code), Simkl, MDBList later
     Library/                  Continue Watching / progress store
+    Sync/                     WebDAV client, Argon2id, Flutter sync reader, native sync
 ```
 
 Generate the Xcode project with `brew install xcodegen && cd apple && xcodegen`, then open
@@ -128,6 +129,7 @@ Status: ✅ in the native app · 🟡 partial · ⬜ not started. Android TV / t
 - ⬜ Media servers (Plex/Jellyfin/Emby) · ⬜ WebDAV browsing · ⬜ YouTube, Reddit, Lemmy video sources
 
 **Account & app**
-- 🟡 Settings (accounts, addons, Trakt) · ⬜ settings search, playback, metadata, looks/palettes, sidebar customisation
-- ⬜ Profiles · ⬜ Backup/restore (compatible with the Flutter export) · ⬜ WebDAV saved syncs with snapshots · ⬜ device-to-device transfer (LAN)
+- 🟡 Settings, deliberately small: Accounts (Real-Debrid, TorBox, Trakt, TMDB), Addons, Sync, About; each row opens one short page · ⬜ playback, looks/palettes (add as rows, not new screens)
+- 🟡 WebDAV sync: ✅ pCloud (EU/US) / Koofr / custom sign-in, ✅ native sync between Apple devices (`<folder>/nextup-native/state.enc`: addons, accounts, favorites, watchlist, Continue Watching), ✅ import from the Flutter sync circle (`<folder>/debrify-sync`, read only: Argon2id + AES-GCM, debrid keys, Trakt, Stremio addons) · ⬜ Flutter favorites/history from its `hot`/`library` sections, joining the Flutter circle as a writer
+- ⬜ Profiles · ⬜ Backup file import (`.debrify` / `.debrify.enc`, Tink streaming AEAD + zip) · ⬜ device-to-device transfer (LAN)
 - ⬜ Onboarding / initial setup · ⬜ in-app update check (native releases) · ⬜ launch animation · ⬜ localisation, accessibility pass

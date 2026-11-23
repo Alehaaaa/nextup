@@ -69,6 +69,15 @@ public final class WatchProgressStore: @unchecked Sendable {
         store.save(Array(list.sorted { $0.updatedAt > $1.updatedAt }.prefix(Self.cap)), key: key)
     }
 
+    /// Replaces Continue Watching with entries merged from another device.
+    public func replaceAll(_ entries: [WatchProgress]) {
+        lock.lock(); defer { lock.unlock() }
+        var positions = store.load([String: Double].self, key: positionsKey) ?? [:]
+        for entry in entries where !entry.isFinished { positions[entry.playbackKey] = entry.position }
+        store.save(positions, key: positionsKey)
+        store.save(Array(entries.sorted { $0.updatedAt > $1.updatedAt }.prefix(Self.cap)), key: key)
+    }
+
     public func remove(_ id: String) {
         lock.lock(); defer { lock.unlock() }
         var list = store.load([WatchProgress].self, key: key) ?? []

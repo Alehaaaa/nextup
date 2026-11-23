@@ -31,6 +31,7 @@ enum AppSection: String, CaseIterable, Hashable, Identifiable {
 /// tab bar on iPhone, and a sidebar on iPad and Mac. Search is the system search tab.
 struct RootView: View {
     @Environment(AppModel.self) private var model
+    @Environment(SyncController.self) private var sync
     #if os(macOS)
     @Environment(\.openWindow) private var openWindow
     #endif
@@ -69,6 +70,7 @@ struct RootView: View {
                     }
             }
             .environment(model)
+            .environment(sync)
         }
         #endif
         .environment(\.play, playAction)
