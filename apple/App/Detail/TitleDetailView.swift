@@ -12,6 +12,7 @@ struct TitleDetailView: View {
     @State private var loadingEpisodes = false
     @State private var sourceTarget: SourceTarget?
     @State private var pendingPlayback: PlaybackRequest?
+    @State private var downloadMessage: String?
     @Environment(\.play) private var play
     @Environment(\.isCompactWidth) private var isCompact
     @State private var error: String?
@@ -25,6 +26,10 @@ struct TitleDetailView: View {
             VStack(alignment: .leading, spacing: 24) {
                 header
                 actions.padding(.horizontal, Theme.gutter)
+                if let downloadMessage {
+                    Text(downloadMessage).font(.footnote).foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity)
+                }
                 if let error {
                     Label(error, systemImage: "exclamationmark.triangle").foregroundStyle(.secondary).padding(.horizontal, Theme.gutter)
                 }
@@ -33,6 +38,7 @@ struct TitleDetailView: View {
                 if let similar = detail?.similar, !similar.isEmpty {
                     PosterRail(title: "More Like This", items: similar) { other in
                         NavigationLink(value: other) { PosterCard(item: other) }.buttonStyle(.plain)
+                            .contextMenu { TitleContextMenu(item: other) }
                     }
                 }
             }
@@ -154,10 +160,32 @@ struct TitleDetailView: View {
                 actionButton("Watchlist", symbol: model.isOnWatchlist(item) ? "bookmark.fill" : "bookmark") {
                     model.toggleWatchlist(item)
                 }
+                downloadButton
             }
             .controlSize(isCompact ? .extraLarge : .regular)
         }
         .frame(maxWidth: .infinity, alignment: .center)
+    }
+
+    private var movieDownload: DownloadRecord? { model.downloads.record(for: item.id) }
+
+    @ViewBuilder
+    private var downloadButton: some View {
+        if item.kind == .movie {
+            switch movieDownload?.state {
+            case .finished?:
+                actionButton("Downloaded", symbol: "checkmark.circle.fill") {}
+                    .disabled(true)
+            case .downloading?, .queued?:
+                actionButton("Downloading", symbol: "arrow.down.circle.dotted") {}
+                    .disabled(true)
+            default:
+                actionButton("Download", symbol: "arrow.down.circle") { open(SourceTarget(item: item, intent: .download)) }
+            }
+        } else {
+            actionButton("Download Season", symbol: "arrow.down.circle") { downloadSeason() }
+                .disabled(episodes.isEmpty || model.activeDebrid == nil && model.addons.isEmpty)
+        }
     }
 
     @ViewBuilder
@@ -190,16 +218,36 @@ struct TitleDetailView: View {
 
     private func playPrimary() {
         guard item.kind == .series else {
-            sourceTarget = SourceTarget(item: item)
+            open(SourceTarget(item: item))
             return
         }
         if let entry = resumeEntry, let s = entry.season, let e = entry.episode {
             let next = entry.isFinished ? e + 1 : e
             let title = episodes.first { $0.season == s && $0.number == next }?.title
-            sourceTarget = SourceTarget(item: item, season: s, episode: next, episodeTitle: title)
+            open(SourceTarget(item: item, season: s, episode: next, episodeTitle: title))
         } else {
             let first = episodes.first
-            sourceTarget = SourceTarget(item: item, season: first?.season ?? 1, episode: first?.number ?? 1, episodeTitle: first?.title)
+            open(SourceTarget(item: item, season: first?.season ?? 1, episode: first?.number ?? 1, episodeTitle: first?.title))
+        }
+    }
+
+    /// Downloaded files play straight away, offline; everything else goes through the sources sheet.
+    private func open(_ target: SourceTarget) {
+        let key = target.season.flatMap { s in target.episode.map { "\(item.id):\(s):\($0)" } } ?? item.id
+        if target.intent == .play, let local = model.downloads.localURL(for: key) {
+            play?.callAsFunction(PlaybackRequest(url: local, item: item, season: target.season, episode: target.episode,
+                                                 episodeTitle: target.episodeTitle, sourceLabel: "Downloaded"))
+        } else {
+            sourceTarget = target
+        }
+    }
+
+    private func downloadSeason() {
+        let item = self.item, list = episodes
+        downloadMessage = "Finding sources for \(list.count) episodes…"
+        Task {
+            let started = await model.downloadSeason(item: item, episodes: list)
+            downloadMessage = started == 0 ? "No episodes could be queued." : "Downloading \(started) episodes."
         }
     }
 
@@ -224,6 +272,7 @@ struct TitleDetailView: View {
                                 EpisodeCard(episode: episode, progress: progress(for: episode), width: isCompact ? 250 : 340)
                             }
                             .buttonStyle(.plain)
+                            .contextMenu { episodeMenu(episode) }
                         }
                     }
                     .padding(.horizontal, Theme.gutter)
@@ -250,8 +299,17 @@ struct TitleDetailView: View {
         }
     }
 
-    private func openSources(for episode: Episode) {
-        sourceTarget = SourceTarget(item: item, season: episode.season, episode: episode.number, episodeTitle: episode.title)
+    @ViewBuilder
+    private func episodeMenu(_ episode: Episode) -> some View {
+        Button { openSources(for: episode) } label: { Label("Play", systemImage: "play") }
+        Button { openSources(for: episode, intent: .download) } label: { Label("Download", systemImage: "arrow.down.circle") }
+        Button { model.markWatched(item, season: episode.season, episode: episode.number) } label: {
+            Label("Mark as Watched", systemImage: "checkmark.circle")
+        }
+    }
+
+    private func openSources(for episode: Episode, intent: SourceIntent = .play) {
+        open(SourceTarget(item: item, season: episode.season, episode: episode.number, episodeTitle: episode.title, intent: intent))
     }
 
     private func progress(for episode: Episode) -> Double? {

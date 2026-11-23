@@ -1,13 +1,17 @@
 import SwiftUI
 import NextupKit
 
+/// What tapping a source does: play it now, or save it to the device.
+enum SourceIntent: Hashable { case play, download }
+
 struct SourceTarget: Identifiable, Hashable {
     var item: MediaItem
     var season: Int?
     var episode: Int?
     var episodeTitle: String?
+    var intent: SourceIntent = .play
 
-    var id: String { "\(item.id):\(season ?? 0):\(episode ?? 0)" }
+    var id: String { "\(item.id):\(season ?? 0):\(episode ?? 0):\(intent)" }
 }
 
 /// Every stream the installed addons offer for one movie or episode.
@@ -55,8 +59,13 @@ struct SourcesView: View {
     }
 
     private var title: String {
-        guard let s = target.season, let e = target.episode else { return target.item.title }
-        return String(format: "%@ · S%02dE%02d", target.item.title, s, e)
+        let base: String
+        if let s = target.season, let e = target.episode {
+            base = String(format: "%@ · S%02dE%02d", target.item.title, s, e)
+        } else {
+            base = target.item.title
+        }
+        return target.intent == .download ? "Download \(base)" : base
     }
 
     @ViewBuilder
@@ -133,23 +142,18 @@ struct SourcesView: View {
         resolvingID = stream.id
         defer { resolvingID = nil }
         do {
-            let url: URL
-            if let direct = stream.url, let parsed = URL(string: direct) {
-                url = parsed
-            } else if let magnet = stream.magnet {
-                guard let debrid = model.activeDebrid else {
-                    throw HTTPError.notConfigured("A debrid service")
-                }
-                let hint = FileHint(fileIndex: stream.fileIdx, filename: stream.behaviorHints?.filename,
-                                    season: target.season, episode: target.episode)
-                url = try await debrid.resolve(magnet: magnet, hint: hint).url
-            } else {
-                throw DebridError.noPlayableFile
+            let resolved = try await model.resolve(stream, for: target)
+            switch target.intent {
+            case .download:
+                model.downloads.start(url: resolved.url, item: target.item, season: target.season, episode: target.episode,
+                                      episodeTitle: target.episodeTitle, filename: resolved.filename)
+                dismiss()
+            case .play:
+                let request = PlaybackRequest(url: resolved.url, item: target.item, season: target.season, episode: target.episode,
+                                              episodeTitle: target.episodeTitle, sourceLabel: stream.headline)
+                onPlay(request)
+                dismiss()
             }
-            let request = PlaybackRequest(url: url, item: target.item, season: target.season, episode: target.episode,
-                                          episodeTitle: target.episodeTitle, sourceLabel: stream.headline)
-            onPlay(request)
-            dismiss()
         } catch {
             self.error = error.localizedDescription
         }

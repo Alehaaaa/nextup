@@ -2,13 +2,14 @@ import SwiftUI
 import NextupKit
 
 enum AppSection: String, CaseIterable, Hashable, Identifiable {
-    case home, search, library, settings
+    case home, reels, search, library, settings
 
     var id: String { rawValue }
 
     var title: String {
         switch self {
         case .home: return "Home"
+        case .reels: return "Reels"
         case .search: return "Search"
         case .library: return "Library"
         case .settings: return "Settings"
@@ -18,6 +19,7 @@ enum AppSection: String, CaseIterable, Hashable, Identifiable {
     var symbol: String {
         switch self {
         case .home: return "house"
+        case .reels: return "play.rectangle.on.rectangle"
         case .search: return "magnifyingglass"
         case .library: return "rectangle.stack"
         case .settings: return "gearshape"
@@ -39,6 +41,9 @@ struct RootView: View {
         TabView(selection: $selection) {
             Tab(AppSection.home.title, systemImage: AppSection.home.symbol, value: AppSection.home) {
                 SectionStack(section: .home)
+            }
+            Tab(AppSection.reels.title, systemImage: AppSection.reels.symbol, value: AppSection.reels) {
+                SectionStack(section: .reels)
             }
             Tab(AppSection.library.title, systemImage: AppSection.library.symbol, value: AppSection.library) {
                 SectionStack(section: .library)
@@ -102,6 +107,7 @@ struct SectionStack: View {
             Group {
                 switch section {
                 case .home: HomeView()
+                case .reels: ReelsView()
                 case .search: SearchView()
                 case .library: LibraryView()
                 case .settings: SettingsView()

@@ -146,18 +146,49 @@ struct PosterRail<Item: Identifiable, Card: View>: View {
     }
 }
 
-/// Context menu shared by every card so hold (iPhone/iPad) and right-click (Mac) behave the same.
+/// The hold (iPhone/iPad) and right-click (Mac) menu on every title card in the app.
 struct TitleContextMenu: View {
+    @Environment(AppModel.self) private var model
+    @Environment(\.openURL) private var openURL
     let item: MediaItem
     var onRemove: (() -> Void)? = nil
 
     var body: some View {
+        Section {
+            Button {
+                model.toggleWatchlist(item)
+            } label: {
+                model.isOnWatchlist(item)
+                    ? Label("Remove from Watchlist", systemImage: "bookmark.slash")
+                    : Label("Add to Watchlist", systemImage: "bookmark")
+            }
+            Button {
+                model.toggleFavorite(item)
+            } label: {
+                model.isFavorite(item)
+                    ? Label("Remove from Favorites", systemImage: "heart.slash")
+                    : Label("Add to Favorites", systemImage: "heart")
+            }
+            if item.kind == .movie {
+                Button {
+                    model.markWatched(item)
+                } label: {
+                    Label("Mark as Watched", systemImage: "checkmark.circle")
+                }
+            }
+        }
         if let imdb = item.imdbID, let url = URL(string: "https://www.imdb.com/title/\(imdb)/") {
-            ShareLink(item: url) { Label("Share", systemImage: "square.and.arrow.up") }
-            Link(destination: url) { Label("Open on IMDb", systemImage: "safari") }
+            Section {
+                ShareLink(item: url, subject: Text(item.title)) { Label("Share", systemImage: "square.and.arrow.up") }
+                Button { openURL(url) } label: { Label("Open on IMDb", systemImage: "safari") }
+            }
         }
         if let onRemove {
-            Button(role: .destructive, action: onRemove) { Label("Remove from Continue Watching", systemImage: "xmark.circle") }
+            Section {
+                Button(role: .destructive, action: onRemove) {
+                    Label("Remove from Continue Watching", systemImage: "xmark.circle")
+                }
+            }
         }
     }
 }

@@ -12,6 +12,26 @@ struct LibraryView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 28) {
+                NavigationLink {
+                    DownloadsView()
+                } label: {
+                    Label {
+                        HStack {
+                            Text("Downloads").font(.headline)
+                            Spacer()
+                            if !model.downloads.active.isEmpty {
+                                Text("\(model.downloads.active.count) in progress").foregroundStyle(.secondary)
+                            } else if !model.downloads.library.isEmpty {
+                                Text("\(model.downloads.library.count)").foregroundStyle(.secondary)
+                            }
+                            Image(systemName: "chevron.right").foregroundStyle(.tertiary)
+                        }
+                    } icon: {
+                        Image(systemName: "arrow.down.circle")
+                    }
+                }
+                .buttonStyle(.plain)
+
                 let entries = model.continueWatching()
                 section("Continue Watching") {
                     if entries.isEmpty {
@@ -33,18 +53,14 @@ struct LibraryView: View {
                 if !model.watchlist.isEmpty {
                     PosterRail(title: "Watchlist", items: model.watchlist) { item in
                         NavigationLink(value: item) { PosterCard(item: item) }.buttonStyle(.plain)
-                            .contextMenu {
-                                Button("Remove from Watchlist", systemImage: "bookmark.slash") { model.toggleWatchlist(item) }
-                            }
+                            .contextMenu { TitleContextMenu(item: item) }
                     }
                     .padding(.horizontal, -Theme.gutter)
                 }
                 if !model.favorites.isEmpty {
                     PosterRail(title: "Favorites", items: model.favorites) { item in
                         NavigationLink(value: item) { PosterCard(item: item) }.buttonStyle(.plain)
-                            .contextMenu {
-                                Button("Remove from Favorites", systemImage: "heart.slash") { model.toggleFavorite(item) }
-                            }
+                            .contextMenu { TitleContextMenu(item: item) }
                     }
                     .padding(.horizontal, -Theme.gutter)
                 }
@@ -60,6 +76,7 @@ struct LibraryView: View {
                                         TraktRow(title: item.title, subtitle: Self.subtitle(entry), progress: entry.progress / 100)
                                     }
                                     .buttonStyle(.plain)
+                                    .contextMenu { TitleContextMenu(item: item) }
                                 }
                             }
                         }
@@ -74,6 +91,7 @@ struct LibraryView: View {
                                         .compactMap { $0 }.joined(separator: " · "), progress: nil)
                                 }
                                 .buttonStyle(.plain)
+                                .contextMenu { TitleContextMenu(item: item) }
                             }
                         }
                     }

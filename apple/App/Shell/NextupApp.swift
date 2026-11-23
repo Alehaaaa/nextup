@@ -1,14 +1,51 @@
+import Combine
 import SwiftUI
 import NextupKit
+
+#if os(iOS)
+import UIKit
+
+/// Lets background downloads finish while the app is suspended or closed.
+final class AppDelegate: NSObject, UIApplicationDelegate {
+    static var pendingBackgroundCompletion: (() -> Void)?
+
+    func application(_ application: UIApplication, handleEventsForBackgroundURLSession identifier: String,
+                     completionHandler: @escaping () -> Void) {
+        guard identifier == DownloadManager.sessionIdentifier else { completionHandler(); return }
+        Self.pendingBackgroundCompletion = completionHandler
+        NotificationCenter.default.post(name: .nextupBackgroundSessionEvents, object: nil)
+    }
+}
+
+extension Notification.Name {
+    static let nextupBackgroundSessionEvents = Notification.Name("nextup.backgroundSessionEvents")
+}
+#endif
 
 @main
 struct NextupApp: App {
     @State private var model = AppModel()
+    #if os(iOS)
+    @UIApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
+    #endif
 
     var body: some Scene {
         WindowGroup {
             RootView()
                 .environment(model)
+                #if os(iOS)
+                .onReceive(NotificationCenter.default.publisher(for: .nextupBackgroundSessionEvents)) { _ in
+                    model.downloads.backgroundCompletion = AppDelegate.pendingBackgroundCompletion
+                    AppDelegate.pendingBackgroundCompletion = nil
+                }
+                .task {
+                    // Relaunched by the system for download events before any UI existed.
+                    if let pending = AppDelegate.pendingBackgroundCompletion {
+                        model.downloads.backgroundCompletion = pending
+                        AppDelegate.pendingBackgroundCompletion = nil
+                    }
+                }
+                #endif
                 .preferredColorScheme(.dark)
                 .tint(Theme.accent)
         }

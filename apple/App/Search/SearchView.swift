@@ -67,6 +67,7 @@ struct SearchView: View {
                         ForEach(Array(picks.enumerated()), id: \.element.id) { index, item in
                             NavigationLink(value: item) { PickRow(rank: index + 1, item: item) }
                                 .buttonStyle(.plain)
+                                .contextMenu { TitleContextMenu(item: item) }
                             if index < picks.count - 1 { Divider().padding(.leading, 64) }
                         }
                     }
@@ -76,11 +77,13 @@ struct SearchView: View {
             if !trendingMovies.isEmpty {
                 PosterRail(title: "Trending Movies", items: trendingMovies) { item in
                     NavigationLink(value: item) { PosterCard(item: item) }.buttonStyle(.plain)
+                        .contextMenu { TitleContextMenu(item: item) }
                 }
             }
             if !trendingSeries.isEmpty {
                 PosterRail(title: "Trending Shows", items: trendingSeries) { item in
                     NavigationLink(value: item) { PosterCard(item: item) }.buttonStyle(.plain)
+                        .contextMenu { TitleContextMenu(item: item) }
                 }
             }
         }

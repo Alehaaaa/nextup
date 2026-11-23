@@ -102,6 +102,29 @@ public struct TMDBClient: Sendable {
         }
     }
 
+    public struct Video: Decodable, Hashable, Sendable {
+        public let key: String
+        public let name: String
+        public let site: String
+        public let type: String
+        public let official: Bool?
+    }
+
+    /// YouTube videos for a title: clips, featurettes, teasers and trailers.
+    public func videos(kind: MediaKind, tmdbID: Int) async throws -> [Video] {
+        struct Response: Decodable { let results: [Video] }
+        // Ask without a language so clips in the original language are included.
+        let response: Response = try await get("/\(kind.tmdbPath)/\(tmdbID)/videos", ["include_video_language": "en,null"])
+        return response.results.filter { $0.site == "YouTube" }
+    }
+
+    /// TMDB ids for a title page, adding the IMDb id (needed for streams).
+    public func externalIMDbID(kind: MediaKind, tmdbID: Int) async throws -> String? {
+        struct Response: Decodable { let imdb_id: String? }
+        let response: Response = try await get("/\(kind.tmdbPath)/\(tmdbID)/external_ids", [:])
+        return response.imdb_id
+    }
+
     /// Resolves a TMDB id from an IMDb id (used for addon and tracker items).
     public func find(imdbID: String) async throws -> MediaItem? {
         let raw: FindResult = try await get("/find/\(imdbID)", ["external_source": "imdb_id"])
