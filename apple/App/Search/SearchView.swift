@@ -10,10 +10,41 @@ struct SearchView: View {
     @State private var trendingMovies: [MediaItem] = []
     @State private var trendingSeries: [MediaItem] = []
     @State private var picks: [MediaItem] = []
+    @State private var scope: SearchScope = .titles
+    @State private var torrents: [TorrentResult] = []
+    @State private var torrentNote: String?
 
     private var columns: [GridItem] { [GridItem(.adaptive(minimum: Theme.railPosterWidth, maximum: Theme.railPosterWidth + 40), spacing: 16)] }
 
     var body: some View {
+        Group {
+            if scope == .torrents {
+                TorrentResultsList(query: query, results: torrents, note: torrentNote, isSearching: isSearching)
+            } else {
+                titleResults
+            }
+        }
+        .navigationTitle("Search")
+        .inlineTitle()
+        .toolbar { SettingsToolbarItem() }
+        #if os(iOS)
+        .searchable(text: $query, placement: .navigationBarDrawer(displayMode: .always), prompt: scope.prompt)
+        #else
+        .searchable(text: $query, placement: .toolbar, prompt: scope.prompt)
+        #endif
+        .searchScopes($scope) {
+            ForEach(SearchScope.allCases) { Text($0.title).tag($0) }
+        }
+        .task { await loadDiscover() }
+        .task(id: "\(scope.rawValue):\(query)") {
+            // Debounce typing; torrent providers are slower and rate-limited, so wait a little longer.
+            try? await Task.sleep(nanoseconds: scope == .torrents ? 700_000_000 : 350_000_000)
+            guard !Task.isCancelled else { return }
+            if scope == .torrents { await searchTorrents(query) } else { await search(query) }
+        }
+    }
+
+    private var titleResults: some View {
         ScrollView {
             if query.isEmpty && !(trendingMovies.isEmpty && trendingSeries.isEmpty) {
                 discover
@@ -40,21 +71,24 @@ struct SearchView: View {
             }
         }
         .overlay(alignment: .top) { if isSearching { ProgressView().padding() } }
-        .navigationTitle("Search")
-        .inlineTitle()
-        .toolbar { SettingsToolbarItem() }
-        #if os(iOS)
-        .searchable(text: $query, placement: .navigationBarDrawer(displayMode: .always), prompt: "Search Nextup")
-        #else
-        .searchable(text: $query, placement: .toolbar, prompt: "Search Nextup")
-        #endif
-        .task { await loadDiscover() }
-        .task(id: query) {
-            // Debounce typing.
-            try? await Task.sleep(nanoseconds: 350_000_000)
-            guard !Task.isCancelled else { return }
-            await search(query)
+    }
+
+    /// Every enabled provider that can search by name, at once.
+    private func searchTorrents(_ text: String) async {
+        let text = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty else { torrents = []; torrentNote = nil; return }
+        let providers = model.providers
+        guard providers.enabledEngines.contains(where: \.keywordSearch) else {
+            torrents = []
+            torrentNote = "Turn on a provider that searches by name, such as The Pirate Bay or Knaben, in Settings → Providers."
+            return
         }
+        isSearching = true
+        defer { isSearching = false }
+        let found = await providers.search(TorrentQuery(keyword: text))
+        guard !Task.isCancelled else { return }
+        torrents = found.results
+        torrentNote = found.failed.isEmpty ? nil : "Didn't answer: " + ListFormatter.localizedString(byJoining: found.failed) + "."
     }
 
     /// Before typing: trending rows and a ranked "What should I watch" list.
@@ -137,6 +171,115 @@ struct SearchView: View {
         if results.isEmpty && model.addons.isEmpty {
             message = "Add a TMDB token or install a catalog addon (such as Cinemeta) in Settings to search."
         }
+    }
+}
+
+enum SearchScope: String, CaseIterable, Identifiable {
+    case titles, torrents
+    var id: String { rawValue }
+    var title: String { self == .titles ? "Titles" : "Torrents" }
+    var prompt: String { self == .titles ? "Search Nextup" : "Search Providers" }
+}
+
+/// Name search across the torrent providers, like the Flutter app's Torrent Search.
+private struct TorrentResultsList: View {
+    @Environment(AppModel.self) private var model
+    @Environment(\.play) private var play
+    let query: String
+    let results: [TorrentResult]
+    let note: String?
+    let isSearching: Bool
+    @State private var working: String?
+    @State private var failure: String?
+
+    var body: some View {
+        List {
+            if results.isEmpty {
+                ContentUnavailableView {
+                    Label(query.isEmpty || isSearching ? "Torrents" : "No Torrents", systemImage: "magnifyingglass")
+                } description: {
+                    Text(note ?? (query.isEmpty ? "Search every provider by name." : isSearching ? "Asking providers…" : "Try other words."))
+                }
+                .listRowSeparator(.hidden)
+            } else {
+                Section {
+                    ForEach(results) { result in
+                        Button { open(result, download: false) } label: { TorrentRow(result: result, working: working == result.id) }
+                            .buttonStyle(.plain)
+                            .contextMenu { menu(result) }
+                            .swipeActions(edge: .trailing) {
+                                Button { open(result, download: true) } label: { Label("Download", systemImage: "arrow.down.circle") }
+                                    .tint(.blue)
+                            }
+                    }
+                } footer: {
+                    Text([("\(results.count) torrents"), note].compactMap { $0 }.joined(separator: " · "))
+                }
+            }
+        }
+        .overlay(alignment: .top) { if isSearching && !results.isEmpty { ProgressView().padding() } }
+        .alert("Couldn't Open Torrent", isPresented: Binding(get: { failure != nil }, set: { if !$0 { failure = nil } })) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(failure ?? "")
+        }
+    }
+
+    @ViewBuilder
+    private func menu(_ result: TorrentResult) -> some View {
+        Button { open(result, download: false) } label: { Label("Play", systemImage: "play") }
+        Button { open(result, download: true) } label: { Label("Download", systemImage: "arrow.down.circle") }
+        Button { Clipboard.copy(result.stream.magnet ?? "") } label: { Label("Copy Magnet Link", systemImage: "link") }
+    }
+
+    /// Resolves through the connected debrid service, then plays or downloads the largest video.
+    private func open(_ result: TorrentResult, download: Bool) {
+        guard working == nil else { return }
+        let item = MediaItem(kind: .movie, title: result.name)
+        let target = SourceTarget(item: item, intent: download ? .download : .play)
+        working = result.id
+        Task {
+            defer { working = nil }
+            do {
+                let resolved = try await model.resolve(result.stream, for: target)
+                if download {
+                    model.downloads.start(url: resolved.url, item: item, season: nil, episode: nil,
+                                          episodeTitle: nil, filename: resolved.filename)
+                } else {
+                    play?.callAsFunction(PlaybackRequest(url: resolved.url, item: item, sourceLabel: result.engine))
+                }
+            } catch {
+                failure = error.localizedDescription
+            }
+        }
+    }
+}
+
+private struct TorrentRow: View {
+    let result: TorrentResult
+    let working: Bool
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 12) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(result.name).font(.subheadline.weight(.medium)).lineLimit(3)
+                HStack(spacing: 10) {
+                    if let seeders = result.seeders {
+                        Label("\(seeders)", systemImage: "person.2.fill").foregroundStyle(seeders > 0 ? Color.green : Color.secondary)
+                    }
+                    if let size = Format.bytes(result.sizeBytes) { Label(size, systemImage: "internaldrive") }
+                    if let date = result.uploaded { Text(date, format: .dateTime.year().month().day()) }
+                    Text(result.engine)
+                }
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .labelStyle(.titleAndIcon)
+            }
+            Spacer(minLength: 0)
+            if working { ProgressView() }
+        }
+        .padding(.vertical, 2)
+        .contentShape(Rectangle())
     }
 }
 

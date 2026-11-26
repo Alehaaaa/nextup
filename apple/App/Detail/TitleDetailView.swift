@@ -17,6 +17,7 @@ struct TitleDetailView: View {
     @Environment(\.openURL) private var openURL
     @Environment(\.isCompactWidth) private var isCompact
     @State private var error: String?
+    @State private var overviewExpanded = false
 
     init(item: MediaItem) {
         _item = State(initialValue: item)
@@ -102,13 +103,17 @@ struct TitleDetailView: View {
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                         .multilineTextAlignment(.center)
-                        .lineLimit(isCompact ? 3 : 2)
+                        .lineLimit(overviewExpanded ? nil : 3)
                         .frame(maxWidth: 720)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .onTapGesture { withAnimation(.smooth) { overviewExpanded.toggle() } }
+                        .accessibilityHint("Shows the whole synopsis")
                 }
             }
             .padding(.horizontal, Theme.gutter)
             .padding(.bottom, 12)
         }
+        .frame(maxWidth: .infinity)
     }
 
     private var moreMenu: some View {
@@ -197,11 +202,75 @@ struct TitleDetailView: View {
                 actionButton("Downloading", symbol: "arrow.down.circle.dotted") {}
                     .disabled(true)
             default:
-                actionButton("Download", symbol: "arrow.down.circle") { open(SourceTarget(item: item, intent: .download)) }
+                actionButton("Download", symbol: "arrow.down.circle") { download(SourceTarget(item: item, intent: .download)) }
             }
         } else {
-            actionButton("Download Season", symbol: "arrow.down.circle") { downloadSeason() }
-                .disabled(episodes.isEmpty || model.activeDebrid == nil && model.addons.isEmpty)
+            actionButton(seriesDownloadTitle, symbol: "arrow.down.circle") { downloadSeries() }
+                .disabled(episodes.isEmpty)
+        }
+    }
+
+    private var seriesDownloadTitle: String {
+        switch model.preferences.seriesDownload {
+        case .episode: return "Download Episode"
+        case .next: return "Download Next \(model.preferences.nextEpisodeCount)"
+        case .season: return "Download Season \(season)"
+        }
+    }
+
+    /// The Download setting: open the sources sheet, or take the best source straight away.
+    private func download(_ target: SourceTarget) {
+        var target = target
+        target.intent = .download
+        guard model.preferences.downloadMode == .automatic else {
+            sourceTarget = target
+            return
+        }
+        let label = target.season.flatMap { s in target.episode.map { String(format: "S%02dE%02d", s, $0) } } ?? item.title
+        downloadMessage = "Finding the best source for \(label)…"
+        Task {
+            let ok = await model.downloadAutomatically(target)
+            downloadMessage = ok ? "Downloading \(label)." : "No source for \(label) could be opened. Try choosing one."
+        }
+    }
+
+    /// The episode Play would start: where Continue Watching is, else the first one shown.
+    private var currentEpisode: Episode? {
+        if let entry = resumeEntry, let s = entry.season, let e = entry.episode {
+            let number = entry.isFinished ? e + 1 : e
+            if let match = episodes.first(where: { $0.season == s && $0.number == number }) { return match }
+            if s == season { return nil }
+        }
+        return episodes.first
+    }
+
+    /// One episode, the next few, or the whole season, as set in Settings → Downloads.
+    private func downloadSeries() {
+        let item = self.item
+        switch model.preferences.seriesDownload {
+        case .episode:
+            guard let episode = currentEpisode ?? episodes.first else { return }
+            download(SourceTarget(item: item, season: episode.season, episode: episode.number, episodeTitle: episode.title))
+        case .next:
+            guard let first = currentEpisode ?? episodes.first else { return }
+            let count = model.preferences.nextEpisodeCount
+            downloadMessage = "Finding sources for \(count) episodes…"
+            Task {
+                var list = [first]
+                while list.count < count, let last = list.last,
+                      let next = await model.nextEpisode(after: item, season: last.season, episode: last.number) {
+                    list.append(next)
+                }
+                let started = await model.downloadEpisodes(item: item, episodes: list)
+                downloadMessage = started == 0 ? "No episodes could be queued." : "Downloading \(started) of \(list.count) episodes."
+            }
+        case .season:
+            let list = episodes
+            downloadMessage = "Finding sources for \(list.count) episodes…"
+            Task {
+                let started = await model.downloadEpisodes(item: item, episodes: list)
+                downloadMessage = started == 0 ? "No episodes could be queued." : "Downloading \(started) of \(list.count) episodes."
+            }
         }
     }
 
@@ -259,15 +328,6 @@ struct TitleDetailView: View {
         }
     }
 
-    private func downloadSeason() {
-        let item = self.item, list = episodes
-        downloadMessage = "Finding sources for \(list.count) episodes…"
-        Task {
-            let started = await model.downloadSeason(item: item, episodes: list)
-            downloadMessage = started == 0 ? "No episodes could be queued." : "Downloading \(started) episodes."
-        }
-    }
-
     private var seasonNumbers: [Int] {
         if let seasons = detail?.seasons, !seasons.isEmpty { return seasons.map(\.number) }
         return Array(Set(addonEpisodes.map(\.season))).sorted()
@@ -320,7 +380,15 @@ struct TitleDetailView: View {
     @ViewBuilder
     private func episodeMenu(_ episode: Episode) -> some View {
         Button { openSources(for: episode) } label: { Label("Play", systemImage: "play") }
-        Button { openSources(for: episode, intent: .download) } label: { Label("Download", systemImage: "arrow.down.circle") }
+        if let record = model.downloads.record(for: "\(item.id):\(episode.season):\(episode.number)") {
+            Button {} label: { Label(record.state == .finished ? "Downloaded" : "Downloading", systemImage: "arrow.down.circle.fill") }
+                .disabled(true)
+        } else {
+            Button {
+                download(SourceTarget(item: item, season: episode.season, episode: episode.number, episodeTitle: episode.title))
+            } label: { Label("Download", systemImage: "arrow.down.circle") }
+            Button { openSources(for: episode, intent: .download) } label: { Label("Download From…", systemImage: "list.bullet") }
+        }
         Button { model.markWatched(item, season: episode.season, episode: episode.number) } label: {
             Label("Mark as Watched", systemImage: "checkmark.circle")
         }
@@ -507,19 +575,12 @@ private struct TitleLogo: View {
 private struct AboutTitleSection: View {
     let item: MediaItem
     let detail: MediaDetail
-    @State private var expanded = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("About").font(.title3.weight(.bold))
             if let tagline = detail.tagline {
                 Text(tagline).font(.subheadline.italic()).foregroundStyle(.secondary)
-            }
-            if !item.overview.isEmpty {
-                Text(item.overview)
-                    .font(.subheadline)
-                    .lineLimit(expanded ? nil : 4)
-                    .onTapGesture { withAnimation(.smooth) { expanded.toggle() } }
             }
             Grid(alignment: .leadingFirstTextBaseline, horizontalSpacing: 16, verticalSpacing: 8) {
                 ForEach(rows, id: \.0) { row in

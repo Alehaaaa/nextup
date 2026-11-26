@@ -6,16 +6,24 @@ struct ArtworkImage: View {
     var contentMode: ContentMode = .fill
 
     var body: some View {
-        AsyncImage(url: url, transaction: Transaction(animation: .easeOut(duration: 0.25))) { phase in
-            switch phase {
-            case .success(let image):
-                image.resizable().aspectRatio(contentMode: contentMode)
-            case .failure:
-                Rectangle().fill(.quaternary).overlay(Image(systemName: "film").foregroundStyle(.secondary))
-            default:
-                Rectangle().fill(.quaternary)
+        // The image is an overlay on a shape that takes exactly the offered size. A filled image
+        // laid out directly would report its own (wider) size and push the whole page past the
+        // screen edges.
+        Rectangle()
+            .fill(.clear)
+            .overlay {
+                AsyncImage(url: url, transaction: Transaction(animation: .easeOut(duration: 0.25))) { phase in
+                    switch phase {
+                    case .success(let image):
+                        image.resizable().aspectRatio(contentMode: contentMode)
+                    case .failure:
+                        Rectangle().fill(.quaternary).overlay(Image(systemName: "film").foregroundStyle(.secondary))
+                    default:
+                        Rectangle().fill(.quaternary)
+                    }
+                }
             }
-        }
+            .clipped()
     }
 }
 

@@ -44,9 +44,20 @@ struct SettingsView: View {
                     LabeledContent("Playback & Sources", value: model.preferences.sourceSort.title)
                 }
                 NavigationLink {
+                    DownloadSettingsView()
+                } label: {
+                    LabeledContent("Downloads", value: model.preferences.downloadMode == .ask ? "Ask" : "Automatic")
+                }
+                NavigationLink {
                     HomeSettingsView()
                 } label: {
                     Text("Home")
+                }
+                NavigationLink {
+                    ProvidersSettingsView()
+                } label: {
+                    let _ = model.providersRevision
+                    LabeledContent("Providers", value: "\(model.providers.enabledEngines.count) on")
                 }
                 NavigationLink {
                     Form { AddonsSection() }.formStyle(.grouped).navigationTitle("Addons")
@@ -361,6 +372,53 @@ private struct PlaybackSettingsView: View {
         }
         .formStyle(.grouped)
         .navigationTitle("Playback & Sources")
+    }
+}
+
+// MARK: Downloads
+
+private struct DownloadSettingsView: View {
+    @Environment(AppModel.self) private var model
+
+    var body: some View {
+        @Bindable var model = model
+        Form {
+            Section {
+                Picker("When You Press Download", selection: $model.preferences.downloadMode) {
+                    ForEach(DownloadMode.allCases) { Text($0.title).tag($0) }
+                }
+                Picker("For Shows", selection: $model.preferences.seriesDownload) {
+                    ForEach(SeriesDownload.allCases) { Text($0.title).tag($0) }
+                }
+                if model.preferences.seriesDownload == .next {
+                    Stepper("Next \(model.preferences.nextEpisodeCount) Episodes",
+                            value: $model.preferences.nextEpisodeCount, in: 2...20)
+                }
+            } footer: {
+                Text("Several episodes always use the best source for each. Long-press an episode to choose its source.")
+            }
+
+            Section {
+                Picker("Highest Quality", selection: $model.preferences.downloadMaxQuality) {
+                    Text("No Limit").tag(0)
+                    ForEach([StreamQuality.uhd2160, .hd1080, .hd720, .sd], id: \.self) { Text($0.label).tag($0.rawValue) }
+                }
+                #if os(iOS)
+                Toggle("Download Over Cellular", isOn: $model.preferences.downloadOverCellular)
+                #endif
+            } footer: {
+                Text("The quality limit applies when Nextup picks the source, so episodes stay small. Sources you choose yourself are downloaded as they are.")
+            }
+
+            Section {
+                LabeledContent("Used by Downloads", value: Format.bytes(model.downloads.usedBytes) ?? "None")
+                if let free = DownloadManager.availableBytes, let text = Format.bytes(free) {
+                    LabeledContent("Available", value: text)
+                }
+            }
+        }
+        .formStyle(.grouped)
+        .navigationTitle("Downloads")
     }
 }
 

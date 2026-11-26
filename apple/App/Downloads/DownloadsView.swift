@@ -18,7 +18,7 @@ struct DownloadsView: View {
                     }
                 }
             }
-            Section("Downloaded") {
+            Section {
                 if downloads.library.isEmpty {
                     Text("Movies and episodes you download appear here and play without a connection.")
                         .foregroundStyle(.secondary)
@@ -44,9 +44,19 @@ struct DownloadsView: View {
                         .swipeActions { deleteButton(record) }
                     }
                 }
+            } header: {
+                Text("Downloaded")
+            } footer: {
+                Text(storageLine(downloads))
             }
         }
         .navigationTitle("Downloads")
+    }
+
+    private func storageLine(_ downloads: DownloadManager) -> String {
+        let used = Format.bytes(downloads.usedBytes) ?? "Nothing"
+        guard let free = Format.bytes(DownloadManager.availableBytes) else { return "\(used) used." }
+        return "\(used) used · \(free) available"
     }
 
     private func episodesSubtitle(_ item: MediaItem) -> String {

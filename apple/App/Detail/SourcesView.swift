@@ -107,9 +107,9 @@ struct SourcesView: View {
 
     @ViewBuilder
     private var content: some View {
-        if model.addons.isEmpty {
-            ContentUnavailableView("No addons installed", systemImage: "puzzlepiece.extension",
-                                   description: Text("Install a stream addon in Settings → Addons to see sources here."))
+        if model.addons.isEmpty && model.providers.enabledEngines.isEmpty {
+            ContentUnavailableView("No addons or providers", systemImage: "puzzlepiece.extension",
+                                   description: Text("Install a stream addon in Settings → Addons, or a provider in Settings → Providers, to see sources here."))
         } else if let lookup {
             let streams = visible
             if lookup.streams.isEmpty {
@@ -155,10 +155,11 @@ struct SourcesView: View {
                         Text(summary(lookup, shown: streams.count))
                     } footer: {
                         if !lookup.failedAddons.isEmpty {
-                            Text("Did not answer: \(lookup.failedAddons.joined(separator: ", "))")
+                            Text("Did not answer: \(lookup.failedAddons.joined(separator: ", ")). Pull down to try again.")
                         }
                     }
                 }
+                .refreshable { await load() }
                 .overlay {
                     if streams.isEmpty {
                         ContentUnavailableView("No sources match", systemImage: "line.3.horizontal.decrease.circle",
@@ -175,17 +176,12 @@ struct SourcesView: View {
         let cached = lookup.streams.filter { $0.traits.cache == .cached }.count
         var parts = ["\(shown) of \(lookup.streams.count) sources"]
         if cached > 0 { parts.append("\(cached) cached") }
-        parts.append("\(lookup.askedAddons) addons")
+        parts.append(lookup.askedAddons == 1 ? "1 source list" : "\(lookup.askedAddons) source lists")
         return parts.joined(separator: " · ")
     }
 
     private func load() async {
-        guard let imdb = target.item.imdbID else {
-            lookup = StreamLookup(streams: [], failedAddons: [], askedAddons: 0)
-            return
-        }
-        let id = AddonClient.videoID(imdbID: imdb, season: target.season, episode: target.episode)
-        lookup = await model.addonClient.streams(from: model.addons, type: target.item.kind.stremioType, id: id)
+        lookup = await model.streams(for: target)
     }
 
     private func open(_ stream: StremioStream) async {

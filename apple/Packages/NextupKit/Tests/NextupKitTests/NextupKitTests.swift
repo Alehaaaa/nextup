@@ -201,3 +201,445 @@ final class StreamTraitsTests: XCTestCase {
         XCTAssertEqual(stream.traits.codec, "AVC")
     }
 }
+
+final class ProviderEngineTests: XCTestCase {
+    func testMiniYAMLBasics() throws {
+        let yaml = """
+        # comment
+        id: x
+        list:
+          - name: "A"
+            path: "a.yaml"
+          - name: B   # trailing
+            path: b.yaml
+        inline: [25, 50, "x y"]
+        nested:
+          flag: true
+          pattern: "👤\\\\s*(\\\\d+)"
+          find: "\\n"
+        empty:
+        """
+        let root = try XCTUnwrap(MiniYAML.parse(yaml) as? [String: Any])
+        XCTAssertEqual(root["id"] as? String, "x")
+        let list = try XCTUnwrap(root["list"] as? [[String: Any]])
+        XCTAssertEqual(list.count, 2)
+        XCTAssertEqual(list[1]["name"] as? String, "B")
+        XCTAssertEqual(list[1]["path"] as? String, "b.yaml")
+        XCTAssertEqual((root["inline"] as? [Any])?.count, 3)
+        let nested = try XCTUnwrap(root["nested"] as? [String: Any])
+        XCTAssertEqual(nested["flag"] as? Bool, true)
+        XCTAssertEqual(nested["pattern"] as? String, #"👤\s*(\d+)"#)
+        XCTAssertEqual(nested["find"] as? String, "\n")
+        XCTAssertTrue(root["empty"] is NSNull)
+    }
+
+    func testPirateBay() throws {
+        let engine = try TorrentEngine(yaml: Self.pirateBay)
+        XCTAssertEqual(engine.id, "pirate_bay")
+        XCTAssertEqual(engine.displayName, "The Pirate Bay")
+        XCTAssertTrue(engine.imdbSearch && engine.keywordSearch)
+        XCTAssertEqual(engine.maxResults, 100)
+        let body = #"[{"id":"1","name":"Movie.2024.1080p.WEB-DL.x264","info_hash":"ABCDEF0123456789ABCDEF0123456789ABCDEF01","leechers":"3","seeders":"42","size":"1073741824","added":"1700000000","category":"207"}]"#
+        let payload = try XCTUnwrap(engine.decode(Data(body.utf8), type: "imdb"))
+        XCTAssertTrue(engine.passesChecks(payload))
+        let results = engine.extractItems(payload, type: "imdb").compactMap(engine.map)
+        XCTAssertEqual(results.count, 1)
+        XCTAssertEqual(results[0].infoHash, "abcdef0123456789abcdef0123456789abcdef01")
+        XCTAssertEqual(results[0].seeders, 42)
+        XCTAssertEqual(results[0].sizeBytes, 1_073_741_824)
+        let empty = #"[{"id":"0","name":"No results returned","info_hash":"0000000000000000000000000000000000000000"}]"#
+        XCTAssertFalse(engine.passesChecks(try XCTUnwrap(engine.decode(Data(empty.utf8), type: "imdb"))))
+    }
+
+    func testTorrentioSpecialParsers() throws {
+        let engine = try TorrentEngine(yaml: Self.torrentio)
+        XCTAssertFalse(engine.keywordSearch)
+        let body = #"{"streams":[{"name":"Torrentio\n1080p","title":"Show.S01E02.1080p.WEB.h264\n👤 17 💾 1.5 GB ⚙️ EZTV","infoHash":"ABCDEF0123456789ABCDEF0123456789ABCDEF02"}]}"#
+        let payload = try XCTUnwrap(engine.decode(Data(body.utf8), type: "series"))
+        let results = engine.extractItems(payload, type: "series").compactMap(engine.map)
+        XCTAssertEqual(results.first?.seeders, 17)
+        XCTAssertEqual(results.first?.sizeBytes, Int64(1.5 * 1_073_741_824))
+        XCTAssertFalse(results.first?.name.contains("\n") ?? true)
+    }
+
+    func testYTSNestedResults() throws {
+        let engine = try TorrentEngine(yaml: Self.yts)
+        let inner = #"{"status":"ok","data":{"movie":{"title_long":"Film (2020)","genres":["Drama","Crime"],"torrents":[{"hash":"ABCDEF0123456789ABCDEF0123456789ABCDEF03","quality":"1080p","type":"bluray","size_bytes":2000,"seeds":9,"peers":1}]}}}"#
+        let wrapped = try JSONSerialization.data(withJSONObject: ["code": 200, "data": ["content": inner]])
+        let payload = try XCTUnwrap(engine.decode(wrapped, type: "imdb"))
+        XCTAssertTrue(engine.passesChecks(payload))
+        let results = engine.extractItems(payload, type: "imdb").compactMap(engine.map)
+        XCTAssertEqual(results.first?.name, "Film (2020) [1080p bluray]")
+        XCTAssertEqual(results.first?.seeders, 9)
+    }
+
+    func testKnabenParses() throws {
+        let engine = try TorrentEngine(yaml: Self.knaben)
+        XCTAssertTrue(engine.keywordSearch)
+        XCTAssertFalse(engine.imdbSearch)
+        let body = #"{"hits":[{"title":"Film 2020 2160p","hash":"abcdef0123456789abcdef0123456789abcdef04","bytes":5,"seeders":3,"peers":1}]}"#
+        let payload = try XCTUnwrap(engine.decode(Data(body.utf8), type: "keyword"))
+        XCTAssertEqual(engine.extractItems(payload, type: "keyword").compactMap(engine.map).first?.name, "Film 2020 2160p")
+    }
+
+    func testSeasonFit() {
+        XCTAssertTrue(ProviderStore.fits("Show.S02E05.1080p", season: 2, episode: 5))
+        XCTAssertTrue(ProviderStore.fits("Show.S02.1080p.WEB", season: 2, episode: 5))
+        XCTAssertTrue(ProviderStore.fits("Show Complete Series", season: 2, episode: 5))
+        XCTAssertFalse(ProviderStore.fits("Show.S02E06.1080p", season: 2, episode: 5))
+        XCTAssertFalse(ProviderStore.fits("Show.S03.1080p", season: 2, episode: 5))
+    }
+
+    static let pirateBay = #"""
+# The Pirate Bay Search Engine Configuration
+# Classic torrent search via The Pirate Bay API
+
+id: pirate_bay
+display_name: "The Pirate Bay"
+icon: sailing
+
+# Engine capabilities
+capabilities:
+  keyword_search: true
+  imdb_search: true
+  series_support: false
+
+# API endpoint
+# Note: IMDB search uses keyword URL - searches for IMDB ID in torrent names
+api:
+  urls:
+    keyword: "https://apibay.org/q.php"
+    imdb: "https://apibay.org/q.php"
+
+# Query parameters
+query_params:
+  type: query_params
+  param_name: "q"
+
+# No pagination - returns fixed ~100 results
+pagination:
+  type: none
+
+# Response format
+response_format:
+  type: direct_json
+  results_path: "$"  # Root array
+
+# Empty result check
+empty_check:
+  type: field_value
+  field: "[0].name"
+  equals: "No results returned"
+
+# Field mappings with transformations
+field_mappings:
+  infohash:
+    source: "info_hash"
+    type: direct
+  name:
+    source: "name"
+    type: direct
+  size_bytes:
+    source: "size"
+    type: direct
+    conversion: string_to_int
+  seeders:
+    source: "seeders"
+    type: direct
+    conversion: string_to_int
+  leechers:
+    source: "leechers"
+    type: direct
+    conversion: string_to_int
+  created_unix:
+    source: "added"
+    type: direct
+    conversion: string_to_int
+  category:
+    source: "category"
+    type: direct
+
+# User-configurable settings
+settings:
+  - id: enabled
+    type: toggle
+    label: "Enable The Pirate Bay"
+    default: true
+  - id: max_results
+    type: dropdown
+    label: "Maximum Results"
+    default: 100
+    options: [25, 50, 75, 100]
+
+# TV mode specific configuration
+tv_mode:
+  enabled_default: true
+  limits:
+    small: 100
+    large: 100
+    quick_play: 100
+"""#
+
+    static let torrentio = #"""
+# Torrentio Search Engine Configuration
+# Stremio addon for IMDB-based searches with series support
+
+id: torrentio
+display_name: "Torrentio"
+icon: cloud
+
+# Engine capabilities
+capabilities:
+  keyword_search: false  # IMDB only
+  imdb_search: true
+  series_support: true
+
+# API endpoints - different for movies and series
+api:
+  urls:
+    movie: "https://torrentio.strem.fun/stream/movie/{imdb_id}.json"
+    series: "https://torrentio.strem.fun/stream/series/{imdb_id}:{season}:{episode}.json"
+
+# Path parameters (URL template variables)
+path_params:
+  type: path_params
+
+# Series configuration
+series_config:
+  max_season_probes: 5
+  default_episode: 1
+
+# No pagination
+pagination:
+  type: none
+
+# Response format
+response_format:
+  type: direct_json
+  results_path: "streams"
+
+# Field mappings with transformations
+field_mappings:
+  infohash:
+    source: "infoHash"
+    type: direct
+    conversion: lowercase
+  name:
+    source: "title"
+    type: direct
+    conversion:
+      type: replace
+      find: "\n"
+      replace: " "
+
+# Special parsers for extracting data from title field
+special_parsers:
+  seeders:
+    source: "title"
+    type: regex
+    pattern: "👤\\s*(\\d+)"
+    capture_group: 1
+    conversion: string_to_int
+  size_bytes:
+    source: "title"
+    type: regex
+    pattern: "💾\\s*([\\d\\.]+)\\s*(KB|MB|GB|TB)"
+    parser_type: size_with_unit
+
+# User-configurable settings
+settings:
+  - id: enabled
+    type: toggle
+    label: "Enable Torrentio"
+    default: true
+  # No max_results setting - returns all available
+
+# No TV mode configuration - advanced search only
+"""#
+
+    static let yts = #"""
+# YTS Search Engine Configuration
+# Movie-focused torrent search via YTS API
+
+id: yts
+display_name: "YTS"
+icon: movie_creation
+
+# Engine capabilities
+capabilities:
+  keyword_search: true
+  imdb_search: true
+  series_support: false
+
+# API endpoints - different for keyword and IMDB search
+api:
+  urls:
+    keyword: "https://r.jina.ai/http://yts.mx/api/v2/list_movies.json"
+    imdb: "https://r.jina.ai/http://yts.mx/api/v2/movie_details.json"
+
+# Query parameters - different param names for each search type
+query_params:
+  type: query_params
+  param_name:
+    keyword: "query_term"
+    imdb: "imdb_id"
+
+# Extra parameters
+extra_params:
+  keyword:
+    limit: 50
+
+# No pagination - fixed limit
+pagination:
+  type: none
+
+# Response format - jina wrapped
+response_format:
+  type: jina_wrapped
+  extract_json: true
+  results_path:
+    keyword: "data.movies"
+    imdb: "data.movie"
+
+# Pre-checks for valid response
+pre_checks:
+  - field: "status"
+    equals: "ok"
+
+# Nested results configuration - torrents within movies
+nested_results:
+  enabled: true
+  items_field: "torrents"
+  parent_fields:
+    - name: "_movie_title"
+      source: "title_long"
+      fallback: "title"
+    - name: "_genres"
+      source: "genres"
+      type: join_comma
+
+# Field mappings with transformations
+field_mappings:
+  infohash:
+    source: "hash"
+    type: direct
+    conversion: lowercase
+  name:
+    type: template
+    template: "{_movie_title} [{quality} {type}]"
+  size_bytes:
+    source: "size_bytes"
+    type: direct
+  seeders:
+    source: "seeds"
+    type: direct
+  leechers:
+    source: "peers"
+    type: direct
+  created_unix:
+    source: "date_uploaded_unix"
+    type: direct
+  category:
+    type: template
+    template: "{_genres}"
+
+# User-configurable settings
+settings:
+  - id: enabled
+    type: toggle
+    label: "Enable YTS"
+    default: true
+  # No max_results setting - fixed API limit
+
+# TV mode specific configuration
+tv_mode:
+  enabled_default: false  # Movies only, not ideal for TV
+  limits:
+    small: 50
+    large: 50
+    quick_play: 50
+"""#
+
+    static let knaben = #"""
+# Knaben Torrent Search Engine
+# Uses POST request with JSON body
+id: "knaben"
+display_name: "Knaben"
+description: "Knaben torrent search using API v1"
+icon: "search"
+categories: ["general"]
+
+capabilities:
+  keyword_search: true
+  imdb_search: false
+  series_support: false
+
+# API configuration with POST method
+api:
+  base_url: "https://api.knaben.org/v1"
+  method: "POST"
+  timeout_seconds: 30
+  params:
+    - name: "query"
+      source: "query"
+      location: "body"
+      required: true
+    - name: "search_field"
+      value: "title"
+      location: "body"
+    - name: "size"
+      value: "100"
+      location: "body"
+      value_type: "int"
+    - name: "hide_unsafe"
+      value: "true"
+      location: "body"
+      value_type: "bool"
+    - name: "hide_xxx"
+      value: "false"
+      location: "body"
+      value_type: "bool"
+
+# Query params configuration (for POST body in this case)
+query_params:
+  type: "query_params"
+  param_name: "query"
+  encode: false
+
+# Pagination using offset-based approach
+pagination:
+  type: "offset"
+  results_per_page: 100
+  max_pages: 5
+  offset:
+    param_name: "from"
+    start_offset: 0
+    location: "body"  # Pagination goes in POST body
+
+# Response parsing
+response_format:
+  type: "json"
+  results_path: "hits"
+
+field_mappings:
+  name: "title"
+  infohash: "hash"
+  size_bytes: "bytes"
+  seeders: "seeders"
+  leechers: "peers"
+
+# Settings
+settings:
+  - id: "enabled"
+    type: "toggle"
+    label: "Enable Knaben"
+    default: true
+  - id: "max_results"
+    type: "dropdown"
+    label: "Max Results"
+    default: 100
+    options: [100, 200, 300, 400, 500]
+
+"""#
+
+}

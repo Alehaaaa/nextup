@@ -16,6 +16,14 @@ struct Preferences: Codable, Equatable {
     var maxQuality = 0
     var cachedFirst = true
 
+    // Downloads
+    var downloadMode: DownloadMode = .ask
+    var seriesDownload: SeriesDownload = .season
+    var nextEpisodeCount = 5
+    /// 0 = no limit, else `StreamQuality.rawValue`. Only used when Nextup picks the source.
+    var downloadMaxQuality = 0
+    var downloadOverCellular = true
+
     // Home
     var showHero = true
     var showTop10 = true
@@ -35,6 +43,11 @@ struct Preferences: Codable, Equatable {
         hideLowQualitySources = try c.decodeIfPresent(Bool.self, forKey: .hideLowQualitySources) ?? d.hideLowQualitySources
         maxQuality = try c.decodeIfPresent(Int.self, forKey: .maxQuality) ?? d.maxQuality
         cachedFirst = try c.decodeIfPresent(Bool.self, forKey: .cachedFirst) ?? d.cachedFirst
+        downloadMode = try c.decodeIfPresent(DownloadMode.self, forKey: .downloadMode) ?? d.downloadMode
+        seriesDownload = try c.decodeIfPresent(SeriesDownload.self, forKey: .seriesDownload) ?? d.seriesDownload
+        nextEpisodeCount = try c.decodeIfPresent(Int.self, forKey: .nextEpisodeCount) ?? d.nextEpisodeCount
+        downloadMaxQuality = try c.decodeIfPresent(Int.self, forKey: .downloadMaxQuality) ?? d.downloadMaxQuality
+        downloadOverCellular = try c.decodeIfPresent(Bool.self, forKey: .downloadOverCellular) ?? d.downloadOverCellular
         showHero = try c.decodeIfPresent(Bool.self, forKey: .showHero) ?? d.showHero
         showTop10 = try c.decodeIfPresent(Bool.self, forKey: .showTop10) ?? d.showTop10
         showAddonCatalogs = try c.decodeIfPresent(Bool.self, forKey: .showAddonCatalogs) ?? d.showAddonCatalogs
@@ -75,6 +88,31 @@ enum SourceSort: String, Codable, CaseIterable, Identifiable {
         case .addon: return "Addon Order"
         case .size: return "Largest First"
         case .seeders: return "Most Seeders"
+        }
+    }
+}
+
+/// What the Download button does, as in the Flutter app.
+enum DownloadMode: String, Codable, CaseIterable, Identifiable {
+    case ask, automatic
+    var id: String { rawValue }
+    var title: String {
+        switch self {
+        case .ask: return "Choose a Source"
+        case .automatic: return "Best Source Automatically"
+        }
+    }
+}
+
+/// How much of a show one Download press queues.
+enum SeriesDownload: String, Codable, CaseIterable, Identifiable {
+    case episode, next, season
+    var id: String { rawValue }
+    var title: String {
+        switch self {
+        case .episode: return "This Episode"
+        case .next: return "Next Episodes"
+        case .season: return "Whole Season"
         }
     }
 }

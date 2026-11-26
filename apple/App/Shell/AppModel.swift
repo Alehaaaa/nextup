@@ -17,7 +17,12 @@ final class AppModel {
     var preferredDebrid: DebridService? {
         didSet { defaults.defaults.set(preferredDebrid?.rawValue, forKey: Keys.preferredDebrid) }
     }
-    var preferences: Preferences { didSet { defaults.save(preferences, key: Keys.preferences) } }
+    var preferences: Preferences {
+        didSet {
+            defaults.save(preferences, key: Keys.preferences)
+            downloads.allowsCellular = preferences.downloadOverCellular
+        }
+    }
     /// Saved on this device; shown in Library.
     var favorites: [MediaItem] { didSet { defaults.save(favorites, key: Keys.favorites); settingsChanged() } }
     var watchlist: [MediaItem] { didSet { defaults.save(watchlist, key: Keys.watchlist); settingsChanged() } }
@@ -43,6 +48,7 @@ final class AppModel {
         self.watchlist = defaults.load([MediaItem].self, key: Keys.watchlist) ?? []
         self.preferences = defaults.load(Preferences.self, key: Keys.preferences) ?? Preferences()
         self.preferredDebrid = defaults.defaults.string(forKey: Keys.preferredDebrid).flatMap(DebridService.init(rawValue:))
+        downloads.allowsCellular = preferences.downloadOverCellular
         seedBuildTimeTMDBToken()
     }
 
@@ -154,6 +160,48 @@ final class AppModel {
         addons.move(fromOffsets: source, toOffset: destination)
     }
 
+    // MARK: Providers
+
+    /// Torrent providers (the Flutter app's downloadable search engines).
+    let providers = ProviderStore()
+    /// Bumped when providers are installed, removed or switched on/off.
+    private(set) var providersRevision = 0
+    func providersChanged() { providersRevision += 1 }
+
+    /// Every source for a movie or episode: addon streams first, then provider results not
+    /// already listed (same torrent hash).
+    func streams(for target: SourceTarget) async -> StreamLookup {
+        let item = target.item
+        let addonsCopy = addons
+        let client = addonClient
+        let providers = self.providers
+        var keyword = item.title
+        if let s = target.season, let e = target.episode { keyword += String(format: " S%02dE%02d", s, e) }
+        else if let year = item.year { keyword += " \(year)" }
+        let query = TorrentQuery(imdbID: item.imdbID, keyword: keyword, isSeries: item.kind == .series,
+                                 season: target.season, episode: target.episode)
+        let engineCount = providers.enabledEngines.filter(\.supportsTitles).count
+
+        let videoID = item.imdbID.map { AddonClient.videoID(imdbID: $0, season: target.season, episode: target.episode) }
+        async let fromAddons = Self.addonStreams(client: client, addons: addonsCopy, type: item.kind.stremioType, id: videoID)
+        async let fromProviders = providers.search(query)
+
+        var lookup = await fromAddons
+        let found = await fromProviders
+        var hashes = Set(lookup.streams.compactMap { $0.infoHash?.lowercased() })
+        for result in found.results where hashes.insert(result.infoHash).inserted {
+            lookup.streams.append(result.stream)
+        }
+        lookup.failedAddons += found.failed
+        lookup.askedAddons += engineCount
+        return lookup
+    }
+
+    nonisolated private static func addonStreams(client: AddonClient, addons: [InstalledAddon], type: String, id: String?) async -> StreamLookup {
+        guard let id else { return StreamLookup(streams: [], failedAddons: [], askedAddons: 0) }
+        return await client.streams(from: addons, type: type, id: id)
+    }
+
     // MARK: Favorites and watchlist
 
     func isFavorite(_ item: MediaItem) -> Bool { favorites.contains { $0.id == item.id } }
@@ -201,29 +249,38 @@ final class AppModel {
     }
 
     /// Picks a source without asking: best quality first, trying a few until one opens.
-    /// Used by season downloads (and later Quick Play).
+    /// Used by automatic downloads, Up Next and Play Best Source. Downloads also respect the
+    /// download quality cap.
     func autoResolve(_ target: SourceTarget, attempts: Int = 4) async throws -> ResolvedStream {
-        guard let imdb = target.item.imdbID else { throw ResolveError.nothingPlayable }
-        let id = AddonClient.videoID(imdbID: imdb, season: target.season, episode: target.episode)
-        let lookup = await addonClient.streams(from: addons, type: target.item.kind.stremioType, id: id)
+        let lookup = await streams(for: target)
+        let cap = target.intent == .download ? preferences.downloadMaxQuality : 0
         let ranked = preferences.arrange(lookup.streams, sort: .best)
             .filter { $0.url != nil || ($0.infoHash != nil && activeDebrid != nil) }
+            .filter { cap == 0 || $0.traits.quality.rawValue <= cap }
         for stream in ranked.prefix(attempts) {
             if let resolved = try? await resolve(stream, for: target) { return resolved }
         }
         throw ResolveError.nothingPlayable
     }
 
-    /// Queues every episode of a season, picking sources automatically. Returns how many started.
-    func downloadSeason(item: MediaItem, episodes: [Episode]) async -> Int {
+    /// Downloads one movie or episode with the best source. Returns false when nothing could be opened.
+    @discardableResult
+    func downloadAutomatically(_ target: SourceTarget) async -> Bool {
+        var target = target
+        target.intent = .download
+        guard let resolved = try? await autoResolve(target) else { return false }
+        downloads.start(url: resolved.url, item: target.item, season: target.season, episode: target.episode,
+                        episodeTitle: target.episodeTitle, filename: resolved.filename)
+        return true
+    }
+
+    /// Queues several episodes, picking sources automatically. Returns how many started.
+    func downloadEpisodes(item: MediaItem, episodes: [Episode]) async -> Int {
         var started = 0
         for episode in episodes where downloads.record(for: "\(item.id):\(episode.season):\(episode.number)") == nil {
-            let target = SourceTarget(item: item, season: episode.season, episode: episode.number, episodeTitle: episode.title)
-            if let resolved = try? await autoResolve(target) {
-                downloads.start(url: resolved.url, item: item, season: episode.season, episode: episode.number,
-                                episodeTitle: episode.title, filename: resolved.filename)
-                started += 1
-            }
+            let target = SourceTarget(item: item, season: episode.season, episode: episode.number,
+                                      episodeTitle: episode.title, intent: .download)
+            if await downloadAutomatically(target) { started += 1 }
         }
         return started
     }

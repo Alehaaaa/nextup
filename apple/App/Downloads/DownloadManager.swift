@@ -47,6 +47,8 @@ final class DownloadManager {
     @ObservationIgnored private let delegate = DownloadDelegate()
     @ObservationIgnored private var resumeData: [String: Data] = [:]
     @ObservationIgnored var backgroundCompletion: (() -> Void)?
+    /// Set from Settings → Downloads; applied per request, so running downloads keep their setting.
+    @ObservationIgnored var allowsCellular = true
     private let key = "nextup.downloads.v1"
 
     init(defaults: DefaultsStore) {
@@ -97,7 +99,7 @@ final class DownloadManager {
             cancelTask(records[existing])
             records.remove(at: existing)
         }
-        let task = session.downloadTask(with: url)
+        let task = session.downloadTask(with: request(for: url))
         task.taskDescription = record.id
         record.taskID = task.taskIdentifier
         record.state = .downloading
@@ -126,7 +128,7 @@ final class DownloadManager {
         if let data = resumeData.removeValue(forKey: id) {
             task = session.downloadTask(withResumeData: data)
         } else {
-            task = session.downloadTask(with: record.remoteURL)
+            task = session.downloadTask(with: request(for: record.remoteURL))
         }
         task.taskDescription = id
         update(id) { $0.state = .downloading; $0.error = nil; $0.taskID = task.taskIdentifier }
@@ -145,6 +147,26 @@ final class DownloadManager {
     func deleteAll(of item: MediaItem) {
         for record in records where record.item.id == item.id { delete(record.id) }
     }
+
+    private func request(for url: URL) -> URLRequest {
+        var request = URLRequest(url: url)
+        request.allowsCellularAccess = allowsCellular
+        request.allowsExpensiveNetworkAccess = allowsCellular
+        return request
+    }
+
+    /// Space the finished files take.
+    var usedBytes: Int64 {
+        records.filter { $0.state == .finished }.reduce(0) { $0 + max($1.totalBytes, $1.receivedBytes) }
+    }
+
+    /// Free space on the device, for the Downloads footer.
+    static var availableBytes: Int64? {
+        let values = try? folder.resourceValues(forKeys: [.volumeAvailableCapacityForImportantUsageKey])
+        return values?.volumeAvailableCapacityForImportantUsage
+    }
+
+    func isQueued(_ id: String) -> Bool { record(for: id) != nil }
 
     // MARK: Delegate callbacks
 
