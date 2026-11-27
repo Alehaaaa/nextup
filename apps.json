@@ -3,7 +3,7 @@
   "identifier": "io.github.alehaaaa.nextup.native.commits",
   "subtitle": "The native SwiftUI Nextup for iPhone and iPad, built from every commit.",
   "description": "Nextup is an independent, unofficial fork of Debrify with a Reels feed, Continue Watching synced across Trakt, Simkl and MDBList, offline-first downloads and a reworked glass interface.\n\nEvery commit to swift in Alehaaaa/nextup is built automatically and published here with a changelog of what changed since the previous build, so updates show up right in SideStore or AltStore. The source keeps the last few builds, so you can always roll back.\n\nNot affiliated with or endorsed by the official Debrify project.",
-  "iconURL": "https://raw.githubusercontent.com/Alehaaaa/nextup/2cdf3f21f08cc57a7ca7b18a7b9891103a85490a/assets/icon/app_icon_flat.png",
+  "iconURL": "https://raw.githubusercontent.com/Alehaaaa/nextup/c3f25fbb8f4416a90a0ff8eb57d899d589e82350/apple/App/Resources/Assets.xcassets/AppIcon.appiconset/icon-ios-1024.png",
   "website": "https://github.com/Alehaaaa/nextup",
   "tintColor": "#7C4DFF",
   "featuredApps": [
@@ -16,11 +16,20 @@
       "developerName": "Alehaaaa",
       "subtitle": "Native beta of Nextup for iPhone and iPad.",
       "localizedDescription": "A native SwiftUI rebuild of Nextup, shared with the Mac app. It is in early development and does not yet have every feature of the main app.\n\n• TMDB home rows, search and title pages\n• Stremio addons for catalogs and streams\n• Real-Debrid and TorBox playback\n• Trakt sign-in, scrobbling, paused items and watchlist\n• Continue Watching on this device\n\nNextup doesn't host or provide any content; you connect the services you already use.\n\nThese are untested builds of every commit, made by GitHub Actions. SideStore or AltStore re-signs them with your own certificate on install. Nextup is an independent fork of Debrify and isn't affiliated with the official project.",
-      "iconURL": "https://raw.githubusercontent.com/Alehaaaa/nextup/2cdf3f21f08cc57a7ca7b18a7b9891103a85490a/assets/icon/app_icon_flat.png",
+      "iconURL": "https://raw.githubusercontent.com/Alehaaaa/nextup/c3f25fbb8f4416a90a0ff8eb57d899d589e82350/apple/App/Resources/Assets.xcassets/AppIcon.appiconset/icon-ios-1024.png",
       "tintColor": "#7C4DFF",
       "category": "entertainment",
       "screenshots": {},
       "versions": [
+        {
+          "version": "0.1.0",
+          "buildVersion": "202611270547",
+          "date": "2026-11-27T05:49:07Z",
+          "localizedDescription": "What's new:\n• Use the native app's full-bleed icon in the Nextup Swift source (c3f25fbb)\n\nBuild 202611270547 from swift@c3f25fb\nhttps://github.com/Alehaaaa/nextup/compare/2cdf3f2...c3f25fb",
+          "downloadURL": "https://github.com/Alehaaaa/nextup/releases/download/native-build-14-c3f25fb/nextup-native-ios-14-c3f25fb.ipa",
+          "size": 2674113,
+          "minOSVersion": "26.0"
+        },
         {
           "version": "0.1.0",
           "buildVersion": "202611270546",
