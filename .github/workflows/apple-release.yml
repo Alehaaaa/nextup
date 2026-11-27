@@ -55,7 +55,8 @@ jobs:
         xcodegen generate
 
     # Same scheme as the Flutter workflow: a UTC timestamp build number that
-    # always increases, so SideStore sees each commit as an update.
+    # always increases. The version also counts up with each run (0.1.<run>),
+    # because SideStore shows and compares the version, not only the build.
     - name: Build iOS (unsigned)
       working-directory: apple
       env:
@@ -66,6 +67,7 @@ jobs:
           -destination 'generic/platform=iOS' -derivedDataPath build \
           CODE_SIGNING_ALLOWED=NO CODE_SIGN_IDENTITY="" \
           CURRENT_PROJECT_VERSION="$(date -u +%Y%m%d%H%M)" \
+          MARKETING_VERSION="0.1.${GITHUB_RUN_NUMBER}" \
           TMDB_READ_ACCESS_TOKEN="${TMDB_READ_ACCESS_TOKEN}" \
           build | tee build-ios.log | grep -E "error:|BUILD" || true
         test -d build/Build/Products/Release-iphoneos/Nextup.app
