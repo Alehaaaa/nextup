@@ -278,9 +278,13 @@ def main() -> None:
         # A separate identifier lets both sources sit side by side in SideStore.
         source["identifier"] = f"io.github.{args.repo.split('/')[0].lower()}.nextup.native.commits"
         source["name"] = "Nextup Swift"
+        # The native app's own full-bleed icon, not the Flutter app's padded one.
+        native_icon = f"{raw}/apple/App/Resources/Assets.xcassets/AppIcon.appiconset/icon-ios-1024.png"
+        source["iconURL"] = native_icon
         source["subtitle"] = "The native SwiftUI Nextup for iPhone and iPad, built from every commit."
         app = source["apps"][0]
         app["name"] = "Nextup Swift"
+        app["iconURL"] = native_icon
         app["subtitle"] = "Native beta of Nextup for iPhone and iPad."
         app["localizedDescription"] = (
             "A native SwiftUI rebuild of Nextup, shared with the Mac app. It is in early "
