@@ -277,10 +277,10 @@ def main() -> None:
     if args.flavor == "native":
         # A separate identifier lets both sources sit side by side in SideStore.
         source["identifier"] = f"io.github.{args.repo.split('/')[0].lower()}.nextup.native.commits"
-        source["name"] = "Nextup Native (beta)"
+        source["name"] = "Nextup Swift"
         source["subtitle"] = "The native SwiftUI Nextup for iPhone and iPad, built from every commit."
         app = source["apps"][0]
-        app["name"] = "Nextup Native"
+        app["name"] = "Nextup Swift"
         app["subtitle"] = "Native beta of Nextup for iPhone and iPad."
         app["localizedDescription"] = (
             "A native SwiftUI rebuild of Nextup, shared with the Mac app. It is in early "
