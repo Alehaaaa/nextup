@@ -102,18 +102,13 @@ def lockup(w: int, h: int, mark_frac: float, text_frac: float, with_bg: bool = T
     return c
 
 
-# iOS uses the same full-bleed artwork as the native Swift app: the mark fills the
-# tile edge to edge on black, with no padding.
-IOS_ICON = Image.open(ROOT / "assets/icon/app_icon_ios.png").convert("RGB")
-
-
 def ios() -> None:
     d = "ios/Runner/Assets.xcassets/AppIcon.appiconset"
     for img in json.loads((ROOT / d / "Contents.json").read_text())["images"]:
         if "filename" not in img:
             continue
         px = round(float(img["size"].split("x")[0]) * int(img["scale"][0]))
-        save(IOS_ICON.resize((px, px), Image.LANCZOS), f"{d}/{img['filename']}", rgb=True)  # App Store rejects alpha
+        save(flat(px), f"{d}/{img['filename']}", rgb=True)  # App Store rejects alpha
 
 
 def macos() -> None:
