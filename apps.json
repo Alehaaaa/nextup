@@ -1,9 +1,9 @@
 {
-  "name": "Nextup Native (beta)",
+  "name": "Nextup Swift",
   "identifier": "io.github.alehaaaa.nextup.native.commits",
   "subtitle": "The native SwiftUI Nextup for iPhone and iPad, built from every commit.",
   "description": "Nextup is an independent, unofficial fork of Debrify with a Reels feed, Continue Watching synced across Trakt, Simkl and MDBList, offline-first downloads and a reworked glass interface.\n\nEvery commit to swift in Alehaaaa/nextup is built automatically and published here with a changelog of what changed since the previous build, so updates show up right in SideStore or AltStore. The source keeps the last few builds, so you can always roll back.\n\nNot affiliated with or endorsed by the official Debrify project.",
-  "iconURL": "https://raw.githubusercontent.com/Alehaaaa/nextup/8acf70eae6a00877a069fd0fd5073c8ca4b6602e/assets/icon/app_icon_flat.png",
+  "iconURL": "https://raw.githubusercontent.com/Alehaaaa/nextup/2cdf3f21f08cc57a7ca7b18a7b9891103a85490a/assets/icon/app_icon_flat.png",
   "website": "https://github.com/Alehaaaa/nextup",
   "tintColor": "#7C4DFF",
   "featuredApps": [
@@ -11,16 +11,25 @@
   ],
   "apps": [
     {
-      "name": "Nextup Native",
+      "name": "Nextup Swift",
       "bundleIdentifier": "com.alehaaaa.nextup.native",
       "developerName": "Alehaaaa",
       "subtitle": "Native beta of Nextup for iPhone and iPad.",
       "localizedDescription": "A native SwiftUI rebuild of Nextup, shared with the Mac app. It is in early development and does not yet have every feature of the main app.\n\n• TMDB home rows, search and title pages\n• Stremio addons for catalogs and streams\n• Real-Debrid and TorBox playback\n• Trakt sign-in, scrobbling, paused items and watchlist\n• Continue Watching on this device\n\nNextup doesn't host or provide any content; you connect the services you already use.\n\nThese are untested builds of every commit, made by GitHub Actions. SideStore or AltStore re-signs them with your own certificate on install. Nextup is an independent fork of Debrify and isn't affiliated with the official project.",
-      "iconURL": "https://raw.githubusercontent.com/Alehaaaa/nextup/8acf70eae6a00877a069fd0fd5073c8ca4b6602e/assets/icon/app_icon_flat.png",
+      "iconURL": "https://raw.githubusercontent.com/Alehaaaa/nextup/2cdf3f21f08cc57a7ca7b18a7b9891103a85490a/assets/icon/app_icon_flat.png",
       "tintColor": "#7C4DFF",
       "category": "entertainment",
       "screenshots": {},
       "versions": [
+        {
+          "version": "0.1.0",
+          "buildVersion": "202611270546",
+          "date": "2026-11-27T05:47:59Z",
+          "localizedDescription": "What's new:\n• Name the native SideStore source Nextup Swift (2cdf3f21)\n\nBuild 202611270546 from swift@2cdf3f2\nhttps://github.com/Alehaaaa/nextup/compare/8acf70e...2cdf3f2",
+          "downloadURL": "https://github.com/Alehaaaa/nextup/releases/download/native-build-13-2cdf3f2/nextup-native-ios-13-2cdf3f2.ipa",
+          "size": 2674115,
+          "minOSVersion": "26.0"
+        },
         {
           "version": "0.1.0",
           "buildVersion": "202611270544",
